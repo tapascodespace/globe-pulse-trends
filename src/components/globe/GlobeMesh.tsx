@@ -135,36 +135,50 @@ export function GlobeMesh({ radius = 2, theme }: GlobeMeshProps) {
   // Create grid
   const gridGeometry = useMemo(() => createSnapchatGrid(radius * 1.001), [radius]);
 
-  // Materials - update based on theme
+  // Materials - update based on theme with better visibility
   const borderMaterial = useMemo(() => 
     new LineBasicMaterial({ 
       color: new Color(theme.borderColor), 
       transparent: true, 
-      opacity: 0.9,
+      opacity: 1,
+      linewidth: 2,
     }), [theme.borderColor]);
 
   const gridMaterial = useMemo(() => 
     new LineBasicMaterial({ 
       color: new Color(theme.gridColor), 
       transparent: true, 
-      opacity: theme.id === 'light' ? 0.4 : 0.25
-    }), [theme.gridColor, theme.id]);
+      opacity: 0.5,
+    }), [theme.gridColor]);
 
   return (
     <>
-      {/* Solid sphere surface - grey globe */}
+      {/* Dark sphere surface */}
       <mesh>
         <sphereGeometry args={[radius, 64, 48]} />
         <meshStandardMaterial 
           color={theme.globeSurface} 
-          roughness={0.8}
-          metalness={0.1}
+          roughness={0.9}
+          metalness={0.05}
+          emissive={theme.globeSurface}
+          emissiveIntensity={0.1}
         />
       </mesh>
       
-      {/* Subtle atmosphere glow */}
+      {/* Atmosphere glow - more visible */}
       <mesh>
-        <sphereGeometry args={[radius * 1.02, 48, 32]} />
+        <sphereGeometry args={[radius * 1.03, 48, 32]} />
+        <meshBasicMaterial
+          color={theme.accentColor}
+          transparent
+          opacity={0.08}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Outer glow ring */}
+      <mesh>
+        <sphereGeometry args={[radius * 1.06, 32, 24]} />
         <meshBasicMaterial
           color={theme.accentColor}
           transparent
@@ -176,7 +190,7 @@ export function GlobeMesh({ radius = 2, theme }: GlobeMeshProps) {
       {/* Grid lines */}
       <lineSegments geometry={gridGeometry} material={gridMaterial} />
       
-      {/* Country borders */}
+      {/* Country borders - rendered on top */}
       {bordersGeometry && (
         <lineSegments geometry={bordersGeometry} material={borderMaterial} />
       )}
