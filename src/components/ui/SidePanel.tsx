@@ -14,29 +14,29 @@ function RealXPostCard({ post, accentColor }: { post: RealXPost; accentColor: st
     <div className="p-4 rounded-xl border transition-all hover:shadow-md" style={{ borderColor: `${accentColor}20` }}>
       <div className="flex items-start gap-3">
         <div 
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
+          className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
           style={{ background: accentColor }}
         >
           {post.author.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">{post.author}</span>
-            <span className="text-xs opacity-50">{post.authorHandle}</span>
-            <span className="text-xs opacity-50">· {post.timestamp}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-base">{post.author}</span>
+            <span className="text-sm opacity-50">{post.authorHandle}</span>
+            <span className="text-sm opacity-50">· {post.timestamp}</span>
           </div>
-          <p className="mt-1 text-sm leading-relaxed opacity-90">{post.text}</p>
-          <div className="flex items-center gap-4 mt-3 text-xs opacity-60">
-            <span className="flex items-center gap-1">
-              <Heart className="w-3.5 h-3.5" />
+          <p className="mt-2 text-base leading-relaxed opacity-90">{post.text}</p>
+          <div className="flex items-center gap-4 mt-3 text-sm opacity-60">
+            <span className="flex items-center gap-1.5">
+              <Heart className="w-4 h-4" />
               {post.likes >= 1000 ? `${(post.likes / 1000).toFixed(1)}k` : post.likes}
             </span>
-            <span className="flex items-center gap-1">
-              <Repeat2 className="w-3.5 h-3.5" />
+            <span className="flex items-center gap-1.5">
+              <Repeat2 className="w-4 h-4" />
               {post.retweets >= 1000 ? `${(post.retweets / 1000).toFixed(1)}k` : post.retweets}
             </span>
-            <span className="flex items-center gap-1">
-              <MessageSquare className="w-3.5 h-3.5" />
+            <span className="flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4" />
               {post.replies >= 1000 ? `${(post.replies / 1000).toFixed(1)}k` : post.replies}
             </span>
           </div>
@@ -52,28 +52,28 @@ function XPostCard({ item, accentColor }: { item: EvidenceItem; accentColor: str
     <div className="p-4 rounded-xl border transition-all hover:shadow-md" style={{ borderColor: `${accentColor}20` }}>
       <div className="flex items-start gap-3">
         <div 
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
+          className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
           style={{ background: accentColor }}
         >
           {item.author.replace('@', '').charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">{item.author}</span>
-            <span className="text-xs opacity-50">· {item.timestamp}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-base">{item.author}</span>
+            <span className="text-sm opacity-50">· {item.timestamp}</span>
           </div>
-          <p className="mt-1 text-sm leading-relaxed opacity-90">{item.text}</p>
-          <div className="flex items-center gap-4 mt-3 text-xs opacity-60">
-            <span className="flex items-center gap-1">
-              <Heart className="w-3.5 h-3.5" />
+          <p className="mt-2 text-base leading-relaxed opacity-90">{item.text}</p>
+          <div className="flex items-center gap-4 mt-3 text-sm opacity-60">
+            <span className="flex items-center gap-1.5">
+              <Heart className="w-4 h-4" />
               {(item.engagement / 1000).toFixed(1)}k
             </span>
-            <span className="flex items-center gap-1">
-              <Repeat2 className="w-3.5 h-3.5" />
+            <span className="flex items-center gap-1.5">
+              <Repeat2 className="w-4 h-4" />
               {Math.floor(item.engagement / 4000)}k
             </span>
-            <span className="flex items-center gap-1">
-              <MessageSquare className="w-3.5 h-3.5" />
+            <span className="flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4" />
               {Math.floor(item.engagement / 8000)}k
             </span>
           </div>
