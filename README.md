@@ -1,73 +1,119 @@
-# Welcome to your Lovable project
+# XMaps - GlobePulse
 
-## Project info
+A minimalistic, premium 3D globe visualization for real-time trending topics from X (Twitter) with Grok AI summaries.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![XMaps Preview](https://img.shields.io/badge/Status-Hackathon-00e5ff)
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- 🌍 **Fullscreen 3D Globe** - Interactive wireframe globe with smooth orbit controls
+- 📊 **Trending Topics Panel** - Real-time top 15 trending topics with strength indicators
+- 🔗 **Topic Arcs** - Visual connections between countries showing topic flow
+- 📍 **Country Markers** - Activity indicators scaled by engagement
+- 📱 **Side Panel** - Detailed view for countries and topics with evidence
+- 🔴 **Live Updates** - SSE/WebSocket support for real-time data
 
-**Use Lovable**
+## Quick Start
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 1. Install dependencies
 
-Changes made via Lovable will be committed automatically to this repo.
+```bash
+npm install
+```
 
-**Use your preferred IDE**
+### 2. Set up environment
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+cp .env.example .env
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Edit `.env` and set your backend URL:
 
-Follow these steps:
+```
+VITE_API_BASE_URL=http://localhost:3001
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 3. Run development server
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Backend API Requirements
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The frontend expects these endpoints from your backend:
 
-**Use GitHub Codespaces**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/summary?window=60m` | GET | Global topics, arcs, and country activity |
+| `/api/countries` | GET | List of countries with ISO2 codes and centroids |
+| `/api/country/:iso2?window=60m` | GET | Country-specific topics and evidence |
+| `/api/topic/:topicId` | GET | Topic details with Grok summary and evidence |
+| `/api/stream?window=60m` | GET (SSE) | Live updates stream |
+| `/api/ws?window=60m` | WS | WebSocket alternative for live updates |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Time Windows
 
-## What technologies are used for this project?
+- `15m` - Last 15 minutes
+- `60m` - Last hour (default)
+- `6h` - Last 6 hours
 
-This project is built with:
+## Live Updates Configuration
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### SSE (Default)
 
-## How can I deploy this project?
+Server-Sent Events is enabled by default. Ensure your backend sends events in this format:
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```json
+{
+  "type": "topic_update",
+  "data": { "id": "1", "title": "Topic", "score": 0.85, ... },
+  "timestamp": "2025-01-17T12:00:00Z"
+}
+```
 
-## Can I connect a custom domain to my Lovable project?
+### WebSocket
 
-Yes, you can!
+To switch to WebSocket, update the `useLiveFeed` hook call in `Index.tsx`:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```tsx
+useLiveFeed({ 
+  window: timeWindow, 
+  connectionType: 'websocket',  // Change from 'sse' to 'websocket'
+  enabled: true 
+});
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Visual Encoding
+
+### Arc Strength
+
+| Tier | Strength | Appearance |
+|------|----------|------------|
+| High | ≥ 0.75 | Thick, bright, fast pulse |
+| Medium | 0.40–0.74 | Normal, subtle pulse |
+| Low | < 0.40 | Thin, faint (hidden if cluttered) |
+
+### Country Markers
+
+- Dot size scales with `activityScore`
+- Glow intensity increases with activity
+- High activity (> 0.8) shows soft halo
+
+## Tech Stack
+
+- **React 18** + TypeScript
+- **Three.js** via @react-three/fiber + drei
+- **TanStack Query** for data fetching
+- **Zustand** for state management
+- **Tailwind CSS** for styling
+
+## Development Notes
+
+- Mock data is used when backend is unavailable
+- Arcs limited to top 60 by default for performance
+- Uses instanced meshes for country markers
+
+## License
+
+MIT
