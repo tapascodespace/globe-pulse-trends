@@ -84,19 +84,31 @@ function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
         enableDamping
       />
       
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 3, 5]} intensity={0.5} />
-      <directionalLight position={[-3, -2, -3]} intensity={0.2} />
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[5, 3, 5]} intensity={0.6} />
+      <directionalLight position={[-3, -2, -3]} intensity={0.3} />
+      <pointLight position={[0, 0, 8]} intensity={0.4} color="#88ccff" />
       
-      {/* Space stars background */}
+      {/* Deep space background with more stars */}
       <Stars 
-        radius={80} 
-        depth={60} 
-        count={4000} 
-        factor={4} 
-        saturation={0} 
+        radius={100} 
+        depth={80} 
+        count={8000} 
+        factor={5} 
+        saturation={0.3} 
         fade 
-        speed={0.3}
+        speed={0.2}
+      />
+      
+      {/* Distant stars layer */}
+      <Stars 
+        radius={150} 
+        depth={100} 
+        count={3000} 
+        factor={3} 
+        saturation={0.1} 
+        fade 
+        speed={0.1}
       />
       
       <RotatingGlobe data={data} countries={countries} />
