@@ -214,7 +214,7 @@ export function SidePanel() {
 
   return (
     <div 
-      className="fixed left-0 top-0 bottom-0 w-[400px] z-40 flex flex-col border-r backdrop-blur-xl animate-in slide-in-from-left duration-300"
+      className="fixed left-0 top-0 bottom-0 w-full sm:w-[350px] md:w-[400px] z-40 flex flex-col border-r backdrop-blur-xl animate-in slide-in-from-left duration-300"
       style={{
         background: theme.panelBg,
         borderColor: theme.panelBorder,

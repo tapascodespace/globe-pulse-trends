@@ -11,14 +11,14 @@ export function ThemeSelector() {
 
   return (
     <div 
-      className="inline-flex items-center gap-1 p-1 rounded-lg backdrop-blur-xl border transition-colors"
+      className="inline-flex items-center gap-0.5 md:gap-1 p-0.5 md:p-1 rounded-lg backdrop-blur-xl border transition-colors"
       style={{
         background: currentTheme.panelBg,
         borderColor: currentTheme.panelBorder,
       }}
     >
       <Palette 
-        className="w-3.5 h-3.5 ml-2" 
+        className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1.5 md:ml-2" 
         style={{ color: currentTheme.accentColor }}
       />
       {themeList.map((theme) => (
@@ -26,7 +26,7 @@ export function ThemeSelector() {
           key={theme.id}
           onClick={() => setThemeId(theme.id)}
           className={cn(
-            'w-6 h-6 rounded-md transition-all duration-200 border-2',
+            'w-5 h-5 md:w-6 md:h-6 rounded-md transition-all duration-200 border-2',
             themeId === theme.id 
               ? 'scale-110 shadow-lg' 
               : 'hover:scale-105 opacity-70 hover:opacity-100'

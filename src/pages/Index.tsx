@@ -41,22 +41,22 @@ export default function Index() {
       />
       
       {/* Top-left: Brand + Controls */}
-      <div className="fixed top-4 left-4 z-30 flex flex-col gap-3">
+      <div className="fixed top-3 left-3 md:top-4 md:left-4 z-30 flex flex-col gap-2 md:gap-3">
         <div 
-          className="px-4 py-2.5 rounded-xl border backdrop-blur-xl flex items-center gap-3 transition-colors"
+          className="px-3 py-2 md:px-4 md:py-2.5 rounded-xl border backdrop-blur-xl flex items-center gap-2 md:gap-3 transition-colors"
           style={{
             background: theme.panelBg,
             borderColor: theme.panelBorder,
           }}
         >
           <div 
-            className="w-2.5 h-2.5 rounded-full animate-pulse"
+            className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full animate-pulse"
             style={{ background: theme.accentColor }}
           />
-          <span className="text-lg font-bold tracking-tight" style={{ color: theme.textColor }}>
+          <span className="text-base md:text-lg font-bold tracking-tight" style={{ color: theme.textColor }}>
             XMaps
           </span>
-          <span className="text-xs font-light opacity-50" style={{ color: theme.textColor }}>
+          <span className="text-[10px] md:text-xs font-light opacity-50 hidden sm:inline" style={{ color: theme.textColor }}>
             GlobePulse
           </span>
         </div>
@@ -64,24 +64,24 @@ export default function Index() {
         <ThemeSelector />
       </div>
 
-      {/* Top-right: Trending panel */}
-      <div className="fixed top-4 right-4 z-30">
+      {/* Top-right: Trending panel - hidden on mobile, shown on tablet+ */}
+      <div className="fixed top-3 right-3 md:top-4 md:right-4 z-30 hidden md:block">
         <TrendingPanel 
           topics={summaryData?.topics || []} 
           isLoading={summaryLoading}
         />
       </div>
 
-      {/* Bottom-left: Legend */}
-      <div className="fixed bottom-4 left-4 z-30">
+      {/* Bottom-left: Legend - smaller on mobile */}
+      <div className="fixed bottom-3 left-3 md:bottom-4 md:left-4 z-30">
         <Legend />
       </div>
 
       {/* Bottom-right: Timestamp */}
       {summaryData?.timestamp && (
-        <div className="fixed bottom-4 right-4 z-30">
+        <div className="fixed bottom-3 right-3 md:bottom-4 md:right-4 z-30">
           <div 
-            className="px-3 py-1.5 text-[10px] font-mono rounded-lg border backdrop-blur-xl transition-colors"
+            className="px-2 py-1 md:px-3 md:py-1.5 text-[9px] md:text-[10px] font-mono rounded-lg border backdrop-blur-xl transition-colors"
             style={{
               background: theme.panelBg,
               borderColor: theme.panelBorder,
