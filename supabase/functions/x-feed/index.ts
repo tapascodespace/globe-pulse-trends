@@ -64,17 +64,18 @@ serve(async (req) => {
 });
 
 function buildSearchQuery(country: string, topics?: string[]): string {
-  // Build a query to find trending discussions about a country
-  let query = `(${country})`;
+  // Build a query to find discussions about a country
+  // Note: Free tier X API has limited operators - no min_faves, min_retweets, etc.
+  let query = `${country}`;
   
-  // Add topic filters if provided
+  // Add topic filters if provided (limit to avoid query length issues)
   if (topics && topics.length > 0) {
-    const topicQuery = topics.slice(0, 3).map(t => `"${t}"`).join(" OR ");
+    const topicQuery = topics.slice(0, 2).map(t => t.replace(/['"]/g, '')).join(" OR ");
     query = `(${country}) (${topicQuery})`;
   }
   
-  // Filter for English, exclude retweets, require some engagement
-  query += " lang:en -is:retweet min_faves:10";
+  // Basic filters available on free tier
+  query += " lang:en -is:retweet -is:reply";
   
   return query;
 }
@@ -82,7 +83,7 @@ function buildSearchQuery(country: string, topics?: string[]): string {
 async function fetchXPosts(query: string, bearerToken: string): Promise<XPost[]> {
   const searchUrl = new URL("https://api.twitter.com/2/tweets/search/recent");
   searchUrl.searchParams.set("query", query);
-  searchUrl.searchParams.set("max_results", "20");
+  searchUrl.searchParams.set("max_results", "10"); // Free tier limit
   searchUrl.searchParams.set("tweet.fields", "created_at,public_metrics,author_id");
   searchUrl.searchParams.set("expansions", "author_id");
   searchUrl.searchParams.set("user.fields", "name,username");
