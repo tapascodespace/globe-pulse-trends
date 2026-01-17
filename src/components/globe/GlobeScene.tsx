@@ -2,12 +2,12 @@
 
 import { Suspense, useCallback, useRef } from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Stars } from '@react-three/drei';
 import { GlobeMesh } from './GlobeMesh';
 import { CountryMarkers } from './CountryMarkers';
 import { TopicArcs } from './TopicArcs';
 import { useGlobeStore } from '@/store/globeStore';
-import type { Country, CountryActivity, TopicArc, GlobalSummary } from '@/types/globe';
+import type { Country, GlobalSummary } from '@/types/globe';
 
 interface GlobeSceneProps {
   data: GlobalSummary | undefined;
@@ -35,21 +35,34 @@ function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
 
   return (
     <>
-      <PerspectiveCamera makeDefault position={[0, 0, 5.5]} fov={45} />
+      <PerspectiveCamera makeDefault position={[0, 0, 6]} fov={45} />
       <OrbitControls
         enablePan={false}
         enableZoom={true}
-        minDistance={3}
-        maxDistance={10}
-        rotateSpeed={0.5}
-        zoomSpeed={0.8}
-        dampingFactor={0.05}
+        minDistance={3.5}
+        maxDistance={12}
+        rotateSpeed={0.4}
+        zoomSpeed={0.6}
+        dampingFactor={0.08}
         enableDamping
       />
       
-      {/* Ambient lighting */}
-      <ambientLight intensity={0.3} />
-      <pointLight position={[10, 10, 10]} intensity={0.5} />
+      {/* Lighting for solid globe */}
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 3, 5]} intensity={0.6} color="#ffffff" />
+      <directionalLight position={[-5, -3, -5]} intensity={0.2} color="#00e5ff" />
+      <pointLight position={[0, 0, 8]} intensity={0.3} color="#00e5ff" />
+      
+      {/* Background stars */}
+      <Stars 
+        radius={100} 
+        depth={50} 
+        count={2000} 
+        factor={3} 
+        saturation={0} 
+        fade 
+        speed={0.5}
+      />
       
       {/* Globe */}
       <GlobeMesh radius={2} />
@@ -63,7 +76,7 @@ function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
         onClick={handleCountryClick}
       />
       
-      {/* Topic arcs */}
+      {/* Topic arcs - rendered AFTER globe so they appear on top */}
       <TopicArcs
         arcs={data?.arcs || []}
         radius={2}
@@ -80,18 +93,23 @@ export function GlobeScene({ data, countries, isLoading }: GlobeSceneProps) {
   return (
     <div 
       ref={containerRef}
-      className="absolute inset-0 bg-gradient-to-b from-background via-background to-[#050810]"
+      className="absolute inset-0"
+      style={{
+        background: 'radial-gradient(ellipse at center, #0a1628 0%, #050810 50%, #020408 100%)'
+      }}
     >
       {/* Vignette overlay */}
       <div 
         className="absolute inset-0 pointer-events-none z-10"
         style={{
-          background: 'radial-gradient(ellipse at center, transparent 30%, hsl(210 30% 4% / 0.6) 80%, hsl(210 30% 4% / 0.9) 100%)'
+          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.7) 100%)'
         }}
       />
       
-      <Canvas>
+      <Canvas gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
+          <color attach="background" args={['#050810']} />
+          <fog attach="fog" args={['#050810', 8, 20]} />
           <GlobeContent data={data} countries={countries} />
         </Suspense>
       </Canvas>
