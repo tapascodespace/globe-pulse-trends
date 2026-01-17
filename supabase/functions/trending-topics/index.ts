@@ -18,20 +18,6 @@ interface TrendingResponse {
   source: 'live' | 'search';
 }
 
-// Country-specific search terms for trending topic discovery
-const COUNTRY_SEARCH_TERMS: Record<string, string[]> = {
-  US: ['breaking news', 'trending', 'viral'],
-  GB: ['UK news', 'London', 'trending UK'],
-  DE: ['Germany news', 'Berlin', 'trending'],
-  FR: ['France news', 'Paris', 'trending'],
-  JP: ['Japan news', 'Tokyo', 'trending'],
-  BR: ['Brazil news', 'trending Brazil'],
-  IN: ['India news', 'trending India'],
-  AU: ['Australia news', 'trending'],
-  CA: ['Canada news', 'trending Canada'],
-  MX: ['Mexico news', 'trending Mexico'],
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -45,7 +31,9 @@ serve(async (req) => {
       throw new Error("X_BEARER_TOKEN is not configured");
     }
 
-    // Use search API to discover trending topics (available on free tier)
+    console.log(`Fetching trending topics for country: ${countryCode}`);
+
+    // Use search API to discover trending topics
     const topics = await discoverTrendingTopics(countryCode, X_BEARER_TOKEN);
 
     const response: TrendingResponse = {
@@ -54,91 +42,135 @@ serve(async (req) => {
       source: 'search',
     };
 
+    console.log(`Returning ${topics.length} trending topics`);
+
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Trending Topics error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    
+    // Return fallback topics on error instead of failing
+    const fallbackTopics = getDefaultTopics("WW");
+    return new Response(JSON.stringify({
+      topics: fallbackTopics,
+      location: "Worldwide",
+      source: 'search',
+      fallback: true,
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
 
-// Discover trending topics using recent search (available on free tier)
+// Discover trending topics using recent search
 async function discoverTrendingTopics(countryCode: string, bearerToken: string): Promise<TrendingTopic[]> {
-  const countryName = getCountryName(countryCode);
+  // Build a search query to find popular content
+  // Use broad, engaging terms to find trending hashtags
+  const queries = getSearchQueries(countryCode);
   
-  // Search for recent popular tweets mentioning the country
-  const searchUrl = new URL("https://api.twitter.com/2/tweets/search/recent");
-  const query = `${countryName} lang:en -is:retweet -is:reply`;
+  const allHashtags = new Map<string, { count: number; engagement: number }>();
   
-  searchUrl.searchParams.set("query", query);
-  searchUrl.searchParams.set("max_results", "50");
-  searchUrl.searchParams.set("tweet.fields", "public_metrics,entities");
+  for (const query of queries) {
+    try {
+      const searchUrl = new URL("https://api.twitter.com/2/tweets/search/recent");
+      
+      searchUrl.searchParams.set("query", query);
+      searchUrl.searchParams.set("max_results", "10"); // Free tier limit
+      searchUrl.searchParams.set("tweet.fields", "public_metrics,entities,created_at");
 
-  const response = await fetch(searchUrl.toString(), {
-    headers: {
-      Authorization: `Bearer ${bearerToken}`,
-    },
-  });
+      console.log(`Searching X for: "${query}"`);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("X Search API error:", response.status, errorText);
-    
-    if (response.status === 401) {
-      throw new Error("Invalid X API credentials");
-    }
-    if (response.status === 429) {
-      throw new Error("X API rate limit exceeded");
-    }
-    throw new Error(`X API error: ${response.status}`);
-  }
+      const response = await fetch(searchUrl.toString(), {
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+        },
+      });
 
-  const data = await response.json();
-  
-  if (!data.data || data.data.length === 0) {
-    return getDefaultTopics(countryCode);
-  }
-
-  // Extract hashtags and common terms from tweets
-  const hashtagCounts = new Map<string, number>();
-  
-  for (const tweet of data.data) {
-    // Count hashtags
-    if (tweet.entities?.hashtags) {
-      for (const hashtag of tweet.entities.hashtags) {
-        const tag = `#${hashtag.tag}`;
-        const engagement = (tweet.public_metrics?.like_count || 0) + 
-                          (tweet.public_metrics?.retweet_count || 0);
-        hashtagCounts.set(tag, (hashtagCounts.get(tag) || 0) + engagement + 1);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`X Search API error for "${query}":`, response.status, errorText);
+        
+        if (response.status === 429) {
+          console.log("Rate limited, using cached/fallback data");
+          break;
+        }
+        continue;
       }
+
+      const data = await response.json();
+      
+      if (data.data && data.data.length > 0) {
+        console.log(`Found ${data.data.length} tweets for "${query}"`);
+        
+        for (const tweet of data.data) {
+          // Extract hashtags
+          if (tweet.entities?.hashtags) {
+            for (const hashtag of tweet.entities.hashtags) {
+              const tag = `#${hashtag.tag}`;
+              const engagement = (tweet.public_metrics?.like_count || 0) + 
+                                (tweet.public_metrics?.retweet_count || 0) * 2;
+              
+              const existing = allHashtags.get(tag) || { count: 0, engagement: 0 };
+              allHashtags.set(tag, {
+                count: existing.count + 1,
+                engagement: existing.engagement + engagement,
+              });
+            }
+          }
+        }
+      }
+      
+      // Small delay between requests to be respectful
+      await new Promise(r => setTimeout(r, 100));
+      
+    } catch (err) {
+      console.error(`Error searching for "${query}":`, err);
     }
   }
 
-  // Sort by engagement and return top hashtags
-  const sortedHashtags = [...hashtagCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
+  // Sort by combined score (frequency * engagement)
+  const sortedHashtags = [...allHashtags.entries()]
+    .map(([name, data]) => ({
+      name,
+      score: data.count * 10 + data.engagement,
+      volume: data.engagement,
+    }))
+    .sort((a, b) => b.score - a.score)
     .slice(0, 10);
+
+  console.log(`Found ${sortedHashtags.length} unique hashtags`);
 
   if (sortedHashtags.length === 0) {
     return getDefaultTopics(countryCode);
   }
 
-  return sortedHashtags.map(([name, score]) => ({
+  return sortedHashtags.map(({ name, volume }) => ({
     name,
     url: `https://twitter.com/search?q=${encodeURIComponent(name)}`,
-    tweetVolume: score * 100, // Approximate
+    tweetVolume: volume > 0 ? volume * 50 : null,
     query: encodeURIComponent(name),
   }));
 }
 
+function getSearchQueries(countryCode: string): string[] {
+  // Build queries that work well with free tier (simple, no advanced operators)
+  const countryName = getCountryName(countryCode);
+  
+  // Use simple terms that are likely to have hashtags
+  const queries = [
+    `${countryName} -is:retweet`,
+    `news ${countryName} -is:retweet`,
+    `trending -is:retweet`,
+  ];
+  
+  return queries.slice(0, 2); // Limit to 2 queries to conserve rate limits
+}
+
 function getCountryName(iso2: string): string {
   const countries: Record<string, string> = {
-    US: 'United States',
-    GB: 'United Kingdom',
+    US: 'USA',
+    GB: 'UK',
     DE: 'Germany',
     FR: 'France',
     JP: 'Japan',
@@ -149,40 +181,51 @@ function getCountryName(iso2: string): string {
     MX: 'Mexico',
     ES: 'Spain',
     IT: 'Italy',
-    KR: 'South Korea',
+    KR: 'Korea',
     CN: 'China',
     RU: 'Russia',
-    ZA: 'South Africa',
+    ZA: 'SouthAfrica',
     NG: 'Nigeria',
     EG: 'Egypt',
-    SA: 'Saudi Arabia',
+    SA: 'SaudiArabia',
     AE: 'UAE',
     TR: 'Turkey',
     PL: 'Poland',
     NL: 'Netherlands',
     SE: 'Sweden',
     CH: 'Switzerland',
+    AR: 'Argentina',
+    CL: 'Chile',
+    CO: 'Colombia',
+    ID: 'Indonesia',
+    PH: 'Philippines',
+    TH: 'Thailand',
+    VN: 'Vietnam',
+    MY: 'Malaysia',
+    SG: 'Singapore',
   };
   return countries[iso2] || iso2;
 }
 
 function getDefaultTopics(countryCode: string): TrendingTopic[] {
-  // Return generic trending topics as fallback
-  const genericTopics = [
-    'Breaking News',
-    'Technology',
-    'Sports',
-    'Entertainment',
-    'Politics',
-    'Business',
-    'Science',
-    'Health',
+  const countryName = getCountryName(countryCode);
+  
+  // Return current event-style topics as fallback
+  const defaultTopics = [
+    '#BreakingNews',
+    '#Trending',
+    '#WorldNews',
+    '#Tech',
+    '#Sports',
+    '#Entertainment',
+    '#Politics',
+    '#Business',
   ];
   
-  return genericTopics.map((name, i) => ({
+  return defaultTopics.map((name, i) => ({
     name,
-    url: `https://twitter.com/search?q=${encodeURIComponent(name + ' ' + getCountryName(countryCode))}`,
-    tweetVolume: Math.floor(Math.random() * 10000) + 1000,
+    url: `https://twitter.com/search?q=${encodeURIComponent(name + ' ' + countryName)}`,
+    tweetVolume: Math.floor(Math.random() * 5000) + 1000,
     query: encodeURIComponent(name),
   }));
 }
