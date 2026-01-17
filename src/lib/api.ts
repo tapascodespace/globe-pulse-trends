@@ -8,6 +8,7 @@ import type {
   TopicDetail,
   LiveUpdate,
 } from '@/types/globe';
+import { ALL_COUNTRIES, COUNTRY_TOPICS, generateCountryPosts } from '@/data/allCountries';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
@@ -147,28 +148,8 @@ function getMockData<T>(endpoint: string): T {
 }
 
 function getMockCountries(): Country[] {
-  return [
-    { iso2: 'US', name: 'United States', lat: 39.8, lon: -98.5 },
-    { iso2: 'GB', name: 'United Kingdom', lat: 54.0, lon: -2.0 },
-    { iso2: 'DE', name: 'Germany', lat: 51.2, lon: 10.4 },
-    { iso2: 'FR', name: 'France', lat: 46.2, lon: 2.2 },
-    { iso2: 'JP', name: 'Japan', lat: 36.2, lon: 138.3 },
-    { iso2: 'AU', name: 'Australia', lat: -25.3, lon: 133.8 },
-    { iso2: 'BR', name: 'Brazil', lat: -14.2, lon: -51.9 },
-    { iso2: 'IN', name: 'India', lat: 20.6, lon: 78.9 },
-    { iso2: 'CN', name: 'China', lat: 35.9, lon: 104.2 },
-    { iso2: 'CA', name: 'Canada', lat: 56.1, lon: -106.3 },
-    { iso2: 'KR', name: 'South Korea', lat: 35.9, lon: 127.8 },
-    { iso2: 'MX', name: 'Mexico', lat: 23.6, lon: -102.6 },
-    { iso2: 'ES', name: 'Spain', lat: 40.5, lon: -3.7 },
-    { iso2: 'IT', name: 'Italy', lat: 41.9, lon: 12.6 },
-    { iso2: 'ZA', name: 'South Africa', lat: -30.6, lon: 22.9 },
-    { iso2: 'AR', name: 'Argentina', lat: -38.4, lon: -63.6 },
-    { iso2: 'NG', name: 'Nigeria', lat: 9.1, lon: 8.7 },
-    { iso2: 'SE', name: 'Sweden', lat: 60.1, lon: 18.6 },
-    { iso2: 'PL', name: 'Poland', lat: 51.9, lon: 19.1 },
-    { iso2: 'SG', name: 'Singapore', lat: 1.4, lon: 103.8 },
-  ];
+  // Import all countries from comprehensive list
+  return ALL_COUNTRIES;
 }
 
 const mockTopics = [
@@ -244,22 +225,21 @@ function generateMockCountryDetail(iso2: string): CountryDetail {
   const countries = getMockCountries();
   const country = countries.find(c => c.iso2 === iso2) || countries[0];
   
+  // Get country-specific topics or fallback to generic
+  const countryTopicTitles = COUNTRY_TOPICS[iso2] || ['Local News', 'Economy Update', 'Cultural Event', 'Sports Update', 'Weather Report'];
+  
   return {
     iso2: country.iso2,
     name: country.name,
     activityScore: Math.random() * 0.5 + 0.5,
-    topics: mockTopics.slice(0, 8).map((t, i) => ({
-      id: t.id,
-      title: t.title,
-      score: Math.max(0.2, 0.9 - i * 0.1),
+    topics: countryTopicTitles.map((title, i) => ({
+      id: `${iso2}-topic-${i}`,
+      title,
+      score: Math.max(0.2, 0.95 - i * 0.12),
       verification: (['verified', 'partially_verified', 'unverified'] as const)[i % 3],
       relatedCountries: [iso2, 'US', 'GB'].slice(0, 2 + Math.floor(Math.random() * 2)),
     })),
-    evidence: [
-      { id: '1', text: 'Breaking: Major developments in this topic are shaping discussions across the region.', author: '@journalist', timestamp: '2m ago', engagement: 12400 },
-      { id: '2', text: 'Analysis thread on the implications of recent events 🧵', author: '@analyst', timestamp: '5m ago', engagement: 8200 },
-      { id: '3', text: 'Official statement released regarding the ongoing situation.', author: '@official', timestamp: '12m ago', engagement: 45000 },
-    ],
+    evidence: generateCountryPosts(iso2, country.name),
   };
 }
 
