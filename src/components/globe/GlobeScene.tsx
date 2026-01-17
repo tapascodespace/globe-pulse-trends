@@ -1,8 +1,9 @@
 // GlobeScene - Main 3D scene container
 
-import { Suspense, useCallback } from 'react';
-import { Canvas, ThreeEvent } from '@react-three/fiber';
+import { Suspense, useCallback, useRef } from 'react';
+import { Canvas, ThreeEvent, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Stars } from '@react-three/drei';
+import { Group } from 'three';
 import { GlobeMesh } from './GlobeMesh';
 import { CountryMarkers } from './CountryMarkers';
 import { TopicArcs } from './TopicArcs';
@@ -16,8 +17,10 @@ interface GlobeSceneProps {
   isLoading?: boolean;
 }
 
-function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
-  const { selectedTopicId, setSelectedCountry, setHoveredCountry, themeId } = useGlobeStore();
+// Rotating globe group that contains mesh, markers, and arcs
+function RotatingGlobe({ data, countries }: { data: GlobalSummary | undefined; countries: Country[] }) {
+  const groupRef = useRef<Group>(null);
+  const { selectedTopicId, setSelectedCountry, setHoveredCountry, themeId, sidePanelOpen } = useGlobeStore();
   const theme = themes[themeId];
 
   const handleCountryHover = useCallback((country: Country | null, event: ThreeEvent<PointerEvent>) => {
@@ -35,6 +38,38 @@ function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
     setSelectedCountry(country);
   }, [setSelectedCountry]);
 
+  // Slow auto-rotation (pause when side panel is open)
+  useFrame((_, delta) => {
+    if (groupRef.current && !sidePanelOpen) {
+      groupRef.current.rotation.y += delta * 0.02;
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      <GlobeMesh radius={2} theme={theme} />
+      
+      <CountryMarkers
+        countries={countries}
+        activities={data?.countries || []}
+        radius={2}
+        theme={theme}
+        onHover={handleCountryHover}
+        onClick={handleCountryClick}
+      />
+      
+      <TopicArcs
+        arcs={data?.arcs || []}
+        radius={2}
+        selectedTopicId={selectedTopicId}
+        maxArcs={50}
+        theme={theme}
+      />
+    </group>
+  );
+}
+
+function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
   return (
     <>
       <PerspectiveCamera makeDefault position={[0, 0, 5.5]} fov={45} />
@@ -64,24 +99,7 @@ function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
         speed={0.3}
       />
       
-      <GlobeMesh radius={2} theme={theme} />
-      
-      <CountryMarkers
-        countries={countries}
-        activities={data?.countries || []}
-        radius={2}
-        theme={theme}
-        onHover={handleCountryHover}
-        onClick={handleCountryClick}
-      />
-      
-      <TopicArcs
-        arcs={data?.arcs || []}
-        radius={2}
-        selectedTopicId={selectedTopicId}
-        maxArcs={50}
-        theme={theme}
-      />
+      <RotatingGlobe data={data} countries={countries} />
     </>
   );
 }

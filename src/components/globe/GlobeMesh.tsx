@@ -1,8 +1,7 @@
 // GlobeMesh - Grid-style globe like Snapchat maps with real country borders
 
-import { useRef, useMemo, useEffect, useState } from 'react';
-import { BufferGeometry, Float32BufferAttribute, LineBasicMaterial, Color, Group } from 'three';
-import { useFrame } from '@react-three/fiber';
+import { useMemo, useEffect, useState } from 'react';
+import { BufferGeometry, Float32BufferAttribute, LineBasicMaterial, Color } from 'three';
 import * as topojson from 'topojson-client';
 import type { Topology, GeometryCollection } from 'topojson-specification';
 import { WORLD_TOPOJSON_URL } from '@/data/worldData';
@@ -118,7 +117,6 @@ function createSnapchatGrid(radius: number): BufferGeometry {
 }
 
 export function GlobeMesh({ radius = 2, theme }: GlobeMeshProps) {
-  const groupRef = useRef<Group>(null);
   const [bordersGeometry, setBordersGeometry] = useState<BufferGeometry | null>(null);
 
   // Fetch and parse world topology
@@ -152,15 +150,8 @@ export function GlobeMesh({ radius = 2, theme }: GlobeMeshProps) {
       opacity: theme.id === 'light' ? 0.4 : 0.25
     }), [theme.gridColor, theme.id]);
 
-  // Slow auto-rotation
-  useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.01;
-    }
-  });
-
   return (
-    <group ref={groupRef}>
+    <>
       {/* Solid sphere surface - grey globe */}
       <mesh>
         <sphereGeometry args={[radius, 64, 48]} />
@@ -189,6 +180,6 @@ export function GlobeMesh({ radius = 2, theme }: GlobeMeshProps) {
       {bordersGeometry && (
         <lineSegments geometry={bordersGeometry} material={borderMaterial} />
       )}
-    </group>
+    </>
   );
 }
