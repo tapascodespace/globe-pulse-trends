@@ -1,217 +1,236 @@
-// GlobeMesh - Solid sphere with grid lines and country-like regions
+// GlobeMesh - Solid sphere with real world country borders
 
-import { useRef, useMemo } from 'react';
-import { Mesh, LineSegments, BufferGeometry, Float32BufferAttribute, LineBasicMaterial, Color } from 'three';
+import { useRef, useMemo, useEffect, useState } from 'react';
+import { Mesh, LineSegments, BufferGeometry, Float32BufferAttribute, LineBasicMaterial, Color, Group } from 'three';
 import { useFrame } from '@react-three/fiber';
+import * as topojson from 'topojson-client';
+import type { Topology, GeometryCollection } from 'topojson-specification';
+import { WORLD_TOPOJSON_URL } from '@/data/worldData';
 
 interface GlobeMeshProps {
   radius?: number;
+  borderColor?: string;
   gridColor?: string;
   surfaceColor?: string;
+  showGrid?: boolean;
+}
+
+interface WorldTopology extends Topology {
+  objects: {
+    countries: GeometryCollection;
+    land: GeometryCollection;
+  };
+}
+
+// Convert lat/lon to 3D position on sphere
+function latLonTo3D(lat: number, lon: number, radius: number): [number, number, number] {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lon + 180) * (Math.PI / 180);
+  
+  return [
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta)
+  ];
+}
+
+// Create line geometry from GeoJSON coordinates
+function createCountryBorders(
+  topology: WorldTopology, 
+  radius: number
+): BufferGeometry {
+  const positions: number[] = [];
+  
+  // Get country mesh from topology
+  const countries = topojson.feature(topology, topology.objects.countries);
+  
+  if (countries.type === 'FeatureCollection') {
+    countries.features.forEach((feature) => {
+      const geometry = feature.geometry;
+      
+      if (geometry.type === 'Polygon') {
+        geometry.coordinates.forEach((ring) => {
+          addRingToPositions(ring, positions, radius);
+        });
+      } else if (geometry.type === 'MultiPolygon') {
+        geometry.coordinates.forEach((polygon) => {
+          polygon.forEach((ring) => {
+            addRingToPositions(ring, positions, radius);
+          });
+        });
+      }
+    });
+  }
+  
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  return geometry;
+}
+
+function addRingToPositions(
+  ring: number[][], 
+  positions: number[], 
+  radius: number
+): void {
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [lon1, lat1] = ring[i];
+    const [lon2, lat2] = ring[i + 1];
+    
+    // Skip if coordinates are invalid
+    if (isNaN(lon1) || isNaN(lat1) || isNaN(lon2) || isNaN(lat2)) continue;
+    
+    // Skip very long lines (crossing dateline artifacts)
+    if (Math.abs(lon2 - lon1) > 90) continue;
+    
+    const [x1, y1, z1] = latLonTo3D(lat1, lon1, radius);
+    const [x2, y2, z2] = latLonTo3D(lat2, lon2, radius);
+    
+    positions.push(x1, y1, z1, x2, y2, z2);
+  }
+}
+
+// Create graticule (lat/lon grid lines)
+function createGraticule(radius: number): BufferGeometry {
+  const positions: number[] = [];
+  const segments = 60;
+
+  // Latitude lines every 30 degrees
+  for (let lat = -60; lat <= 60; lat += 30) {
+    for (let i = 0; i <= segments; i++) {
+      const lon1 = (i / segments) * 360 - 180;
+      const lon2 = ((i + 1) / segments) * 360 - 180;
+      
+      if (i < segments) {
+        const [x1, y1, z1] = latLonTo3D(lat, lon1, radius);
+        const [x2, y2, z2] = latLonTo3D(lat, lon2, radius);
+        positions.push(x1, y1, z1, x2, y2, z2);
+      }
+    }
+  }
+
+  // Longitude lines every 30 degrees
+  for (let lon = -180; lon < 180; lon += 30) {
+    for (let i = 0; i <= segments; i++) {
+      const lat1 = (i / segments) * 180 - 90;
+      const lat2 = ((i + 1) / segments) * 180 - 90;
+      
+      if (i < segments) {
+        const [x1, y1, z1] = latLonTo3D(lat1, lon, radius);
+        const [x2, y2, z2] = latLonTo3D(lat2, lon, radius);
+        positions.push(x1, y1, z1, x2, y2, z2);
+      }
+    }
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  return geometry;
 }
 
 export function GlobeMesh({ 
   radius = 2, 
+  borderColor = '#00e5ff',
   gridColor = '#00e5ff',
-  surfaceColor = '#0a1525'
+  surfaceColor = '#0a1220',
+  showGrid = true
 }: GlobeMeshProps) {
-  const globeRef = useRef<Mesh>(null);
-  const gridRef = useRef<LineSegments>(null);
-  const outlineRef = useRef<LineSegments>(null);
+  const groupRef = useRef<Group>(null);
+  const [bordersGeometry, setBordersGeometry] = useState<BufferGeometry | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Create latitude/longitude grid lines
-  const gridGeometry = useMemo(() => {
-    const geometry = new BufferGeometry();
-    const positions: number[] = [];
-    const segments = 64;
-
-    // Latitude lines (horizontal circles)
-    for (let lat = -60; lat <= 60; lat += 20) {
-      const phi = (90 - lat) * (Math.PI / 180);
-      const r = radius * 1.002; // Slightly above surface
-      for (let i = 0; i <= segments; i++) {
-        const theta = (i / segments) * Math.PI * 2;
-        const x = r * Math.sin(phi) * Math.cos(theta);
-        const y = r * Math.cos(phi);
-        const z = r * Math.sin(phi) * Math.sin(theta);
-        
-        if (i > 0) {
-          const prevTheta = ((i - 1) / segments) * Math.PI * 2;
-          positions.push(
-            r * Math.sin(phi) * Math.cos(prevTheta),
-            r * Math.cos(phi),
-            r * Math.sin(phi) * Math.sin(prevTheta),
-            x, y, z
-          );
-        }
-      }
-    }
-
-    // Longitude lines (vertical half-circles)
-    for (let lon = 0; lon < 360; lon += 20) {
-      const theta = lon * (Math.PI / 180);
-      const r = radius * 1.002;
-      for (let i = 0; i <= segments; i++) {
-        const phi = (i / segments) * Math.PI;
-        const x = r * Math.sin(phi) * Math.cos(theta);
-        const y = r * Math.cos(phi);
-        const z = r * Math.sin(phi) * Math.sin(theta);
-        
-        if (i > 0) {
-          const prevPhi = ((i - 1) / segments) * Math.PI;
-          positions.push(
-            r * Math.sin(prevPhi) * Math.cos(theta),
-            r * Math.cos(prevPhi),
-            r * Math.sin(prevPhi) * Math.sin(theta),
-            x, y, z
-          );
-        }
-      }
-    }
-
-    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-    return geometry;
+  // Fetch and parse world topology
+  useEffect(() => {
+    fetch(WORLD_TOPOJSON_URL)
+      .then(res => res.json())
+      .then((topology: WorldTopology) => {
+        const geometry = createCountryBorders(topology, radius * 1.001);
+        setBordersGeometry(geometry);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load world data:', err);
+        setIsLoading(false);
+      });
   }, [radius]);
 
-  // Create stylized "continent" outlines (simplified polygonal shapes)
-  const outlineGeometry = useMemo(() => {
-    const geometry = new BufferGeometry();
-    const positions: number[] = [];
-    const r = radius * 1.003;
+  // Create graticule grid
+  const graticuleGeometry = useMemo(() => createGraticule(radius * 1.0005), [radius]);
 
-    // Helper to add a line segment
-    const addLine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-      const phi1 = (90 - lat1) * (Math.PI / 180);
-      const theta1 = (lon1 + 180) * (Math.PI / 180);
-      const phi2 = (90 - lat2) * (Math.PI / 180);
-      const theta2 = (lon2 + 180) * (Math.PI / 180);
-      
-      positions.push(
-        -r * Math.sin(phi1) * Math.cos(theta1),
-        r * Math.cos(phi1),
-        r * Math.sin(phi1) * Math.sin(theta1),
-        -r * Math.sin(phi2) * Math.cos(theta2),
-        r * Math.cos(phi2),
-        r * Math.sin(phi2) * Math.sin(theta2)
-      );
-    };
-
-    // Simplified North America outline
-    const northAmerica = [
-      [70, -170], [65, -140], [60, -140], [55, -130], [50, -125],
-      [45, -125], [35, -120], [30, -115], [25, -110], [20, -105],
-      [15, -95], [20, -90], [25, -80], [30, -80], [35, -75],
-      [40, -75], [45, -70], [45, -65], [50, -60], [55, -60],
-      [60, -65], [65, -70], [70, -80], [75, -95], [70, -170]
-    ];
-
-    // Simplified South America outline
-    const southAmerica = [
-      [10, -75], [5, -80], [0, -80], [-5, -80], [-10, -75],
-      [-15, -75], [-20, -70], [-25, -65], [-35, -70], [-45, -75],
-      [-55, -70], [-55, -65], [-45, -65], [-35, -55], [-25, -45],
-      [-15, -40], [-5, -35], [0, -50], [5, -60], [10, -75]
-    ];
-
-    // Simplified Europe outline
-    const europe = [
-      [70, 25], [65, 30], [60, 30], [55, 20], [50, 5],
-      [45, -5], [40, -10], [35, -5], [35, 25], [40, 30],
-      [45, 30], [50, 40], [55, 50], [60, 45], [65, 40], [70, 25]
-    ];
-
-    // Simplified Africa outline
-    const africa = [
-      [35, -5], [30, -10], [25, -15], [20, -15], [15, -20],
-      [10, -15], [5, -5], [0, 10], [-5, 15], [-10, 20],
-      [-20, 25], [-30, 30], [-35, 20], [-35, 15], [-25, 15],
-      [-15, 30], [-5, 40], [5, 50], [15, 50], [25, 35],
-      [30, 30], [35, 35], [35, -5]
-    ];
-
-    // Simplified Asia outline
-    const asia = [
-      [70, 180], [70, 140], [65, 100], [60, 80], [55, 50],
-      [50, 40], [45, 40], [40, 50], [35, 70], [30, 80],
-      [25, 90], [20, 100], [10, 105], [5, 100], [0, 105],
-      [-5, 110], [0, 130], [10, 140], [20, 140], [30, 130],
-      [40, 140], [50, 140], [55, 155], [60, 170], [65, 180], [70, 180]
-    ];
-
-    // Simplified Australia outline
-    const australia = [
-      [-15, 130], [-20, 115], [-25, 115], [-30, 130], [-35, 140],
-      [-40, 145], [-40, 150], [-35, 155], [-30, 155], [-25, 150],
-      [-20, 145], [-15, 140], [-12, 135], [-15, 130]
-    ];
-
-    // Draw continent outlines
-    [northAmerica, southAmerica, europe, africa, asia, australia].forEach(continent => {
-      for (let i = 0; i < continent.length - 1; i++) {
-        addLine(continent[i][0], continent[i][1], continent[i + 1][0], continent[i + 1][1]);
-      }
-    });
-
-    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-    return geometry;
-  }, [radius]);
-
-  // Slow auto-rotation
-  useFrame((_, delta) => {
-    if (globeRef.current) {
-      globeRef.current.rotation.y += delta * 0.015;
-    }
-    if (gridRef.current) {
-      gridRef.current.rotation.y += delta * 0.015;
-    }
-    if (outlineRef.current) {
-      outlineRef.current.rotation.y += delta * 0.015;
-    }
-  });
+  // Materials
+  const borderMaterial = useMemo(() => 
+    new LineBasicMaterial({ 
+      color: new Color(borderColor), 
+      transparent: true, 
+      opacity: 0.85,
+    }), [borderColor]);
 
   const gridMaterial = useMemo(() => 
     new LineBasicMaterial({ 
-      color: new Color(gridColor).multiplyScalar(0.3), 
+      color: new Color(gridColor).multiplyScalar(0.25), 
       transparent: true, 
-      opacity: 0.4
+      opacity: 0.3
     }), [gridColor]);
 
-  const outlineMaterial = useMemo(() => 
-    new LineBasicMaterial({ 
-      color: new Color(gridColor), 
-      transparent: true, 
-      opacity: 0.7,
-      linewidth: 2
-    }), [gridColor]);
+  // Slow auto-rotation
+  useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * 0.012;
+    }
+  });
 
   return (
-    <group>
+    <group ref={groupRef}>
       {/* Solid dark sphere - the actual globe surface */}
-      <mesh ref={globeRef}>
+      <mesh>
         <sphereGeometry args={[radius, 64, 48]} />
         <meshStandardMaterial 
           color={surfaceColor}
-          roughness={0.9}
-          metalness={0.1}
+          roughness={0.95}
+          metalness={0.05}
         />
       </mesh>
       
-      {/* Atmosphere glow layer */}
+      {/* Ocean color layer */}
       <mesh>
-        <sphereGeometry args={[radius * 1.02, 48, 32]} />
+        <sphereGeometry args={[radius * 0.999, 64, 48]} />
+        <meshBasicMaterial 
+          color="#061018"
+        />
+      </mesh>
+      
+      {/* Atmosphere glow */}
+      <mesh>
+        <sphereGeometry args={[radius * 1.015, 48, 32]} />
         <meshBasicMaterial
           color="#00e5ff"
           transparent
-          opacity={0.03}
+          opacity={0.02}
           depthWrite={false}
         />
       </mesh>
 
-      {/* Grid lines */}
-      <lineSegments ref={gridRef} geometry={gridGeometry} material={gridMaterial} />
+      {/* Graticule grid lines */}
+      {showGrid && (
+        <lineSegments geometry={graticuleGeometry} material={gridMaterial} />
+      )}
       
-      {/* Continent outlines */}
-      <lineSegments ref={outlineRef} geometry={outlineGeometry} material={outlineMaterial} />
+      {/* Country borders */}
+      {bordersGeometry && (
+        <lineSegments geometry={bordersGeometry} material={borderMaterial} />
+      )}
+      
+      {/* Loading indicator sphere pulse */}
+      {isLoading && (
+        <mesh>
+          <sphereGeometry args={[radius * 1.01, 32, 24]} />
+          <meshBasicMaterial
+            color="#00e5ff"
+            transparent
+            opacity={0.1}
+            wireframe
+          />
+        </mesh>
+      )}
     </group>
   );
 }
