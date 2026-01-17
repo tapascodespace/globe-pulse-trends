@@ -2,6 +2,7 @@
 
 import { Clock } from 'lucide-react';
 import { useGlobeStore } from '@/store/globeStore';
+import { themes } from '@/lib/themes';
 import type { TimeWindow } from '@/types/globe';
 import { cn } from '@/lib/utils';
 
@@ -12,21 +13,28 @@ const TIME_OPTIONS: { value: TimeWindow; label: string }[] = [
 ];
 
 export function TimeWindowSelector() {
-  const { timeWindow, setTimeWindow } = useGlobeStore();
+  const { timeWindow, setTimeWindow, themeId } = useGlobeStore();
+  const theme = themes[themeId];
 
   return (
-    <div className="glass-panel inline-flex items-center gap-1 p-1 fade-in">
-      <Clock className="w-3.5 h-3.5 text-muted-foreground ml-2" />
+    <div 
+      className="inline-flex items-center gap-1 p-1 rounded-lg border backdrop-blur-xl transition-colors"
+      style={{
+        background: theme.panelBg,
+        borderColor: theme.panelBorder,
+      }}
+    >
+      <Clock className="w-3.5 h-3.5 ml-2" style={{ color: theme.accentColor }} />
       {TIME_OPTIONS.map((option) => (
         <button
           key={option.value}
           onClick={() => setTimeWindow(option.value)}
-          className={cn(
-            'px-3 py-1.5 text-xs font-medium rounded transition-all duration-200',
-            timeWindow === option.value
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-          )}
+          className="px-3 py-1.5 text-xs font-medium rounded transition-all duration-200"
+          style={{
+            background: timeWindow === option.value ? theme.accentColor : 'transparent',
+            color: timeWindow === option.value ? '#ffffff' : theme.textColor,
+            opacity: timeWindow === option.value ? 1 : 0.6,
+          }}
         >
           {option.label}
         </button>

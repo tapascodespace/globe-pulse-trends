@@ -1,25 +1,24 @@
 // XMaps - GlobePulse Visualization
-// Real-time trending topics from X (Twitter) + Grok summaries
 
-import { useEffect } from 'react';
 import { GlobeScene } from '@/components/globe/GlobeScene';
 import { TrendingPanel } from '@/components/ui/TrendingPanel';
 import { TimeWindowSelector } from '@/components/ui/TimeWindowSelector';
+import { ThemeSelector } from '@/components/ui/ThemeSelector';
 import { HoverTooltip } from '@/components/ui/HoverTooltip';
 import { SidePanel } from '@/components/ui/SidePanel';
 import { Legend } from '@/components/ui/Legend';
 import { useGlobeStore } from '@/store/globeStore';
+import { themes } from '@/lib/themes';
 import { useGlobalSummary, useCountries } from '@/hooks/useGlobeData';
 import { useLiveFeed } from '@/hooks/useLiveFeed';
 
 export default function Index() {
-  const { timeWindow } = useGlobeStore();
+  const { timeWindow, themeId } = useGlobeStore();
+  const theme = themes[themeId];
   
-  // Fetch global data
   const { data: summaryData, isLoading: summaryLoading } = useGlobalSummary(timeWindow);
   const { data: countriesData, isLoading: countriesLoading } = useCountries();
   
-  // Connect to live feed
   useLiveFeed({ 
     window: timeWindow, 
     connectionType: 'sse',
@@ -30,7 +29,10 @@ export default function Index() {
   const countries = countriesData || [];
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-background">
+    <div 
+      className="relative h-screen w-screen overflow-hidden transition-colors duration-500"
+      style={{ background: theme.background }}
+    >
       {/* 3D Globe */}
       <GlobeScene 
         data={summaryData} 
@@ -38,20 +40,28 @@ export default function Index() {
         isLoading={isLoading}
       />
       
-      {/* Top-left: Brand + Time selector */}
+      {/* Top-left: Brand + Controls */}
       <div className="fixed top-4 left-4 z-30 flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <div className="glass-panel px-4 py-2 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-lg font-semibold tracking-tight text-foreground">
-              XMaps
-            </span>
-            <span className="text-xs text-muted-foreground font-light">
-              GlobePulse
-            </span>
-          </div>
+        <div 
+          className="px-4 py-2.5 rounded-xl border backdrop-blur-xl flex items-center gap-3 transition-colors"
+          style={{
+            background: theme.panelBg,
+            borderColor: theme.panelBorder,
+          }}
+        >
+          <div 
+            className="w-2.5 h-2.5 rounded-full animate-pulse"
+            style={{ background: theme.accentColor }}
+          />
+          <span className="text-lg font-bold tracking-tight" style={{ color: theme.textColor }}>
+            XMaps
+          </span>
+          <span className="text-xs font-light opacity-50" style={{ color: theme.textColor }}>
+            GlobePulse
+          </span>
         </div>
         <TimeWindowSelector />
+        <ThemeSelector />
       </div>
 
       {/* Top-right: Trending panel */}
@@ -67,10 +77,18 @@ export default function Index() {
         <Legend />
       </div>
 
-      {/* Bottom-right: Data timestamp */}
+      {/* Bottom-right: Timestamp */}
       {summaryData?.timestamp && (
         <div className="fixed bottom-4 right-4 z-30">
-          <div className="glass-panel-dark px-3 py-1.5 text-[10px] text-muted-foreground font-mono">
+          <div 
+            className="px-3 py-1.5 text-[10px] font-mono rounded-lg border backdrop-blur-xl transition-colors"
+            style={{
+              background: theme.panelBg,
+              borderColor: theme.panelBorder,
+              color: theme.textColor,
+              opacity: 0.7,
+            }}
+          >
             Updated: {new Date(summaryData.timestamp).toLocaleTimeString()}
           </div>
         </div>
@@ -79,7 +97,7 @@ export default function Index() {
       {/* Hover tooltip */}
       <HoverTooltip activities={summaryData?.countries || []} />
 
-      {/* Side panel */}
+      {/* Side panel - LEFT side */}
       <SidePanel />
     </div>
   );

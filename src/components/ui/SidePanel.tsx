@@ -1,55 +1,78 @@
-// SidePanel - Country/Topic details panel
+// SidePanel - Country X feed panel (LEFT side)
 
-import { X, MapPin, TrendingUp, MessageSquare, Shield, AlertCircle, HelpCircle, ExternalLink } from 'lucide-react';
+import { X, MapPin, TrendingUp, MessageSquare, Users, Clock, Heart, Repeat2, ExternalLink } from 'lucide-react';
 import { useGlobeStore } from '@/store/globeStore';
 import { useCountryDetail, useTopicDetail } from '@/hooks/useGlobeData';
+import { themes } from '@/lib/themes';
 import type { VerificationStatus, EvidenceItem, Topic } from '@/types/globe';
 import { cn } from '@/lib/utils';
 
-function VerificationIcon({ status }: { status: VerificationStatus }) {
-  const icons = {
-    verified: <Shield className="w-3.5 h-3.5 text-emerald-400" />,
-    partially_verified: <AlertCircle className="w-3.5 h-3.5 text-amber-400" />,
-    unverified: <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />,
-  };
-  return icons[status];
-}
-
-function EvidenceCard({ item }: { item: EvidenceItem }) {
+function XPostCard({ item, accentColor }: { item: EvidenceItem; accentColor: string }) {
   return (
-    <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
-      <p className="text-sm text-foreground/90 leading-relaxed">{item.text}</p>
-      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-        <span>{item.author}</span>
-        <div className="flex items-center gap-3">
-          <span>{item.timestamp}</span>
-          <span className="text-primary">{(item.engagement / 1000).toFixed(1)}k</span>
+    <div className="p-4 rounded-xl border transition-all hover:shadow-md" style={{ borderColor: `${accentColor}20` }}>
+      <div className="flex items-start gap-3">
+        <div 
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
+          style={{ background: accentColor }}
+        >
+          {item.author.replace('@', '').charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm">{item.author}</span>
+            <span className="text-xs opacity-50">· {item.timestamp}</span>
+          </div>
+          <p className="mt-1 text-sm leading-relaxed opacity-90">{item.text}</p>
+          <div className="flex items-center gap-4 mt-3 text-xs opacity-60">
+            <span className="flex items-center gap-1">
+              <Heart className="w-3.5 h-3.5" />
+              {(item.engagement / 1000).toFixed(1)}k
+            </span>
+            <span className="flex items-center gap-1">
+              <Repeat2 className="w-3.5 h-3.5" />
+              {Math.floor(item.engagement / 4000)}k
+            </span>
+            <span className="flex items-center gap-1">
+              <MessageSquare className="w-3.5 h-3.5" />
+              {Math.floor(item.engagement / 8000)}k
+            </span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function TopicListItem({ topic, onClick }: { topic: Topic; onClick: () => void }) {
+function TopicCard({ 
+  topic, 
+  onClick, 
+  accentColor 
+}: { 
+  topic: Topic; 
+  onClick: () => void; 
+  accentColor: string;
+}) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-2.5 rounded-md bg-muted/20 hover:bg-muted/40 border border-border/20 transition-colors"
+      className="w-full text-left p-3 rounded-xl border transition-all hover:shadow-md"
+      style={{ borderColor: `${accentColor}30` }}
     >
       <div className="flex items-center gap-2">
-        <VerificationIcon status={topic.verification} />
-        <span className="text-sm font-medium text-foreground truncate">{topic.title}</span>
+        <TrendingUp className="w-4 h-4" style={{ color: accentColor }} />
+        <span className="font-medium text-sm">{topic.title}</span>
       </div>
-      <div className="flex items-center gap-2 mt-1.5">
-        <div className="trend-bar w-20">
+      <div className="flex items-center gap-3 mt-2">
+        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: `${accentColor}20` }}>
           <div 
-            className="trend-bar-fill" 
-            style={{ width: `${Math.min(100, topic.score * 100)}%` }}
+            className="h-full rounded-full transition-all"
+            style={{ 
+              width: `${topic.score * 100}%`,
+              background: accentColor 
+            }}
           />
         </div>
-        <span className="text-xs text-muted-foreground">
-          {topic.relatedCountries?.length || 0} regions
-        </span>
+        <span className="text-xs opacity-60">{(topic.score * 100).toFixed(0)}%</span>
       </div>
     </button>
   );
@@ -62,11 +85,14 @@ export function SidePanel() {
     timeWindow,
     sidePanelOpen,
     showDetailedTopicView,
+    themeId,
     setSelectedCountry,
     setSelectedTopicId,
     setSidePanelOpen,
     setShowDetailedTopicView,
   } = useGlobeStore();
+
+  const theme = themes[themeId];
 
   const { data: countryData, isLoading: countryLoading } = useCountryDetail(
     selectedCountry?.iso2 || null,
@@ -96,148 +122,161 @@ export function SidePanel() {
   };
 
   return (
-    <div className="fixed right-0 top-0 bottom-0 w-96 glass-panel rounded-none border-l border-border/30 slide-in-right z-40 flex flex-col">
+    <div 
+      className="fixed left-0 top-0 bottom-0 w-[400px] z-40 flex flex-col border-r backdrop-blur-xl animate-in slide-in-from-left duration-300"
+      style={{
+        background: theme.panelBg,
+        borderColor: theme.panelBorder,
+        color: theme.textColor,
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border/30">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: theme.panelBorder }}>
+        <div className="flex items-center gap-3">
           {showTopicDetail ? (
             <>
-              <TrendingUp className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium truncate max-w-[250px]">
-                {topicData.title}
-              </span>
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: `${theme.accentColor}20` }}
+              >
+                <TrendingUp className="w-5 h-5" style={{ color: theme.accentColor }} />
+              </div>
+              <div>
+                <h2 className="font-semibold text-base truncate max-w-[260px]">{topicData.title}</h2>
+                <p className="text-xs opacity-60">Trending Topic</p>
+              </div>
             </>
           ) : showCountryDetail ? (
             <>
-              <MapPin className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">{countryData.name}</span>
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: `${theme.accentColor}20` }}
+              >
+                <MapPin className="w-5 h-5" style={{ color: theme.accentColor }} />
+              </div>
+              <div>
+                <h2 className="font-semibold text-base">{countryData.name}</h2>
+                <p className="text-xs opacity-60">What's happening</p>
+              </div>
             </>
-          ) : (
-            <span className="text-sm font-medium text-muted-foreground">Details</span>
-          )}
+          ) : null}
         </div>
         <button
           onClick={handleClose}
-          className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+          className="p-2 rounded-lg transition-colors hover:opacity-70"
+          style={{ background: `${theme.accentColor}10` }}
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
+      <div className="flex-1 overflow-y-auto p-4">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div 
+              className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor: theme.accentColor, borderTopColor: 'transparent' }}
+            />
           </div>
         ) : showTopicDetail ? (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Grok Summary */}
-            <div>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <div 
+              className="p-4 rounded-xl"
+              style={{ background: `${theme.accentColor}10` }}
+            >
+              <h3 className="text-xs font-semibold uppercase tracking-wider opacity-60 mb-2">
                 AI Summary
               </h3>
-              <p className="text-sm text-foreground/90 leading-relaxed">
-                {topicData.grokSummary}
-              </p>
+              <p className="text-sm leading-relaxed">{topicData.grokSummary}</p>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-muted/20 border border-border/20">
-                <div className="text-xs text-muted-foreground mb-1">Trend Score</div>
-                <div className="text-lg font-semibold text-primary">
+              <div className="p-4 rounded-xl border" style={{ borderColor: `${theme.accentColor}20` }}>
+                <div className="text-xs opacity-60 mb-1">Trend Score</div>
+                <div className="text-2xl font-bold" style={{ color: theme.accentColor }}>
                   {(topicData.score * 100).toFixed(0)}%
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-muted/20 border border-border/20">
-                <div className="text-xs text-muted-foreground mb-1">Regions</div>
-                <div className="text-lg font-semibold text-foreground">
+              <div className="p-4 rounded-xl border" style={{ borderColor: `${theme.accentColor}20` }}>
+                <div className="text-xs opacity-60 mb-1">Countries</div>
+                <div className="text-2xl font-bold">
                   {topicData.relatedCountries?.length || 0}
                 </div>
               </div>
             </div>
 
-            {/* Related Countries */}
+            {/* X Posts */}
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                Top Regions
+              <h3 className="text-xs font-semibold uppercase tracking-wider opacity-60 mb-3 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                From X
               </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {topicData.relatedCountries?.slice(0, 8).map(iso => (
-                  <span 
-                    key={iso}
-                    className="px-2 py-1 text-xs bg-muted/30 rounded border border-border/30 text-foreground/80"
-                  >
-                    {iso}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Evidence */}
-            <div>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                <MessageSquare className="w-3.5 h-3.5" />
-                Evidence ({topicData.evidence?.length || 0})
-              </h3>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {topicData.evidence?.map(item => (
-                  <EvidenceCard key={item.id} item={item} />
+                  <XPostCard key={item.id} item={item} accentColor={theme.accentColor} />
                 ))}
               </div>
             </div>
           </div>
         ) : showCountryDetail ? (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Activity Score */}
-            <div className="p-4 rounded-lg bg-gradient-to-br from-primary/10 to-transparent border border-primary/20">
-              <div className="text-xs text-muted-foreground mb-1">Activity Score</div>
-              <div className="text-2xl font-semibold text-primary">
-                {(countryData.activityScore * 100).toFixed(0)}%
+            <div 
+              className="p-4 rounded-xl"
+              style={{ background: `${theme.accentColor}15` }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider opacity-60">Activity Level</span>
+                <span className="text-lg font-bold" style={{ color: theme.accentColor }}>
+                  {(countryData.activityScore * 100).toFixed(0)}%
+                </span>
               </div>
-              <div className="trend-bar w-full mt-2">
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: `${theme.accentColor}20` }}>
                 <div 
-                  className="trend-bar-fill" 
-                  style={{ width: `${countryData.activityScore * 100}%` }}
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${countryData.activityScore * 100}%`,
+                    background: theme.accentColor 
+                  }}
                 />
               </div>
             </div>
 
-            {/* Topics */}
+            {/* Trending Topics */}
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                Topics ({countryData.topics?.length || 0})
+              <h3 className="text-xs font-semibold uppercase tracking-wider opacity-60 mb-3 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Trending in {countryData.name}
               </h3>
               <div className="space-y-2">
-                {countryData.topics?.slice(0, 8).map(topic => (
-                  <TopicListItem 
+                {countryData.topics?.slice(0, 6).map(topic => (
+                  <TopicCard 
                     key={topic.id} 
                     topic={topic} 
                     onClick={() => handleTopicClick(topic.id)}
+                    accentColor={theme.accentColor}
                   />
                 ))}
               </div>
             </div>
 
-            {/* Evidence */}
+            {/* X Feed */}
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                <MessageSquare className="w-3.5 h-3.5" />
-                Recent Posts
+              <h3 className="text-xs font-semibold uppercase tracking-wider opacity-60 mb-3 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Live from X
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {countryData.evidence?.map(item => (
-                  <EvidenceCard key={item.id} item={item} />
+                  <XPostCard key={item.id} item={item} accentColor={theme.accentColor} />
                 ))}
               </div>
             </div>
           </div>
-        ) : (
-          <div className="text-center py-12 text-muted-foreground text-sm">
-            Select a country or topic to see details
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -1,22 +1,35 @@
 // Legend - Small legend for visual meanings
 
-
+import { useGlobeStore } from '@/store/globeStore';
+import { themes } from '@/lib/themes';
 
 export function Legend() {
+  const { themeId } = useGlobeStore();
+  const theme = themes[themeId];
+
   return (
-    <div className="glass-panel-dark px-3 py-2 fade-in">
-      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+    <div 
+      className="px-3 py-2 rounded-lg border backdrop-blur-xl transition-colors"
+      style={{
+        background: theme.panelBg,
+        borderColor: theme.panelBorder,
+        color: theme.textColor,
+      }}
+    >
+      <div className="flex items-center gap-4 text-[10px] opacity-60">
         <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <div 
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ background: theme.accentColor }}
+          />
           <span>Activity</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-4 h-0.5 bg-primary rounded-full" />
+          <div 
+            className="w-4 h-0.5 rounded-full"
+            style={{ background: theme.accentColor }}
+          />
           <span>Topic Flow</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-0.5 bg-primary/30 rounded-full" />
-          <span>Low Activity</span>
         </div>
       </div>
     </div>

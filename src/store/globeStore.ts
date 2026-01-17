@@ -2,11 +2,16 @@
 
 import { create } from 'zustand';
 import type { TimeWindow, Country } from '@/types/globe';
+import type { ThemeId } from '@/lib/themes';
 
 interface GlobeState {
   // Time window selection
   timeWindow: TimeWindow;
   setTimeWindow: (window: TimeWindow) => void;
+
+  // Theme
+  themeId: ThemeId;
+  setThemeId: (id: ThemeId) => void;
 
   // Selected topic for highlighting
   selectedTopicId: string | null;
@@ -39,6 +44,9 @@ interface GlobeState {
 export const useGlobeStore = create<GlobeState>((set) => ({
   timeWindow: '60m',
   setTimeWindow: (window) => set({ timeWindow: window }),
+
+  themeId: 'light',
+  setThemeId: (id) => set({ themeId: id }),
 
   selectedTopicId: null,
   setSelectedTopicId: (id) => set((state) => ({
