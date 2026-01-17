@@ -35,6 +35,7 @@ export function CountryMarkers({
 }: CountryMarkersProps) {
   const meshRef = useRef<InstancedMesh>(null);
   const glowRef = useRef<InstancedMesh>(null);
+  const haloRef = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
   const timeRef = useRef(0);
 
@@ -45,10 +46,9 @@ export function CountryMarkers({
     return map;
   }, [activities]);
 
-  // Compute positions and colors
-  const { positions, colors, configs } = useMemo(() => {
+  // Compute positions and configs
+  const { positions, configs } = useMemo(() => {
     const positions: Vector3[] = [];
-    const colors: Color[] = [];
     const configs: ReturnType<typeof getMarkerVisualConfig>[] = [];
 
     countries.forEach(country => {
@@ -56,40 +56,51 @@ export function CountryMarkers({
       const score = activity?.activityScore || 0.1;
       const config = getMarkerVisualConfig(score);
       
-      positions.push(latLonToVector3(country.lat, country.lon, radius * 1.01));
-      colors.push(new Color('#00e5ff'));
+      // Position markers slightly above the globe surface
+      positions.push(latLonToVector3(country.lat, country.lon, radius * 1.015));
       configs.push(config);
     });
 
-    return { positions, colors, configs };
+    return { positions, configs };
   }, [countries, activityMap, radius]);
 
   // Animate markers
   useFrame((_, delta) => {
-    if (!meshRef.current || !glowRef.current) return;
+    if (!meshRef.current || !glowRef.current || !haloRef.current) return;
     
     timeRef.current += delta;
     
     positions.forEach((pos, i) => {
       const config = configs[i];
-      const pulse = Math.sin(timeRef.current * 2 + i * 0.5) * 0.1 + 1;
+      const pulse = Math.sin(timeRef.current * 2.5 + i * 0.7) * 0.15 + 1;
       
       // Main dot
       dummy.position.copy(pos);
-      dummy.scale.setScalar(config.size * pulse);
+      dummy.scale.setScalar(config.size * 1.2 * pulse);
       dummy.updateMatrix();
       meshRef.current!.setMatrixAt(i, dummy.matrix);
-      meshRef.current!.setColorAt(i, colors[i].clone().multiplyScalar(config.opacity));
 
       // Glow
-      dummy.scale.setScalar(config.glowSize * pulse);
+      dummy.scale.setScalar(config.glowSize * 1.3 * pulse);
       dummy.updateMatrix();
       glowRef.current!.setMatrixAt(i, dummy.matrix);
+      
+      // Halo for high activity
+      if (config.showHalo) {
+        const haloPulse = Math.sin(timeRef.current * 1.5 + i) * 0.3 + 1;
+        dummy.scale.setScalar(config.glowSize * 2 * haloPulse);
+        dummy.updateMatrix();
+        haloRef.current!.setMatrixAt(i, dummy.matrix);
+      } else {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        haloRef.current!.setMatrixAt(i, dummy.matrix);
+      }
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
     glowRef.current.instanceMatrix.needsUpdate = true;
-    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+    haloRef.current.instanceMatrix.needsUpdate = true;
   });
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
@@ -112,16 +123,30 @@ export function CountryMarkers({
 
   return (
     <group>
-      {/* Glow layer */}
+      {/* Outer halo for high activity */}
       <instancedMesh 
-        ref={glowRef} 
+        ref={haloRef} 
         args={[undefined, undefined, countries.length]}
       >
         <sphereGeometry args={[1, 8, 6]} />
         <meshBasicMaterial 
           color="#00e5ff" 
           transparent 
-          opacity={0.15}
+          opacity={0.08}
+          depthWrite={false}
+        />
+      </instancedMesh>
+
+      {/* Glow layer */}
+      <instancedMesh 
+        ref={glowRef} 
+        args={[undefined, undefined, countries.length]}
+      >
+        <sphereGeometry args={[1, 10, 8]} />
+        <meshBasicMaterial 
+          color="#00e5ff" 
+          transparent 
+          opacity={0.25}
           depthWrite={false}
         />
       </instancedMesh>
@@ -134,8 +159,8 @@ export function CountryMarkers({
         onPointerOut={handlePointerOut}
         onClick={handleClick}
       >
-        <sphereGeometry args={[1, 12, 8]} />
-        <meshBasicMaterial color="#00e5ff" transparent />
+        <sphereGeometry args={[1, 16, 12]} />
+        <meshBasicMaterial color="#00ffff" transparent opacity={0.95} />
       </instancedMesh>
     </group>
   );
