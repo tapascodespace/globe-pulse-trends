@@ -11,6 +11,40 @@ import type {
 import { ALL_COUNTRIES, COUNTRY_TOPICS, generateCountryPosts } from '@/data/allCountries';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Types for real X API responses
+export interface RealXPost {
+  id: string;
+  text: string;
+  author: string;
+  authorHandle: string;
+  timestamp: string;
+  engagement: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+}
+
+export interface RealXFeedResponse {
+  posts: RealXPost[];
+  summary?: string;
+  error?: string;
+}
+
+export interface RealTrendingTopic {
+  name: string;
+  url: string;
+  tweetVolume: number | null;
+  query: string;
+}
+
+export interface RealTrendingResponse {
+  topics: RealTrendingTopic[];
+  location: string;
+  error?: string;
+}
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -276,4 +310,115 @@ function generateMockTopicDetail(topicId: string): TopicDetail {
       { id: '4', text: 'Community reaction has been overwhelmingly positive. Here\'s what people are saying.', author: '@reporter', timestamp: '15m ago', engagement: 8900 },
     ],
   };
+}
+
+// Real X API Integration via Edge Functions
+export async function fetchRealXFeed(
+  country: string,
+  countryCode: string,
+  topics?: string[]
+): Promise<RealXFeedResponse> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.warn('Supabase not configured, using mock data');
+    const mockPosts = generateCountryPosts(countryCode, country);
+    return {
+      posts: mockPosts.map(p => ({
+        id: p.id,
+        text: p.text,
+        author: p.author.replace('@', ''),
+        authorHandle: p.author,
+        timestamp: p.timestamp,
+        engagement: p.engagement,
+        likes: Math.floor(p.engagement * 0.6),
+        retweets: Math.floor(p.engagement * 0.3),
+        replies: Math.floor(p.engagement * 0.1),
+      })),
+    };
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/x-feed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+      body: JSON.stringify({ country, countryCode, topics }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch real X feed:', error);
+    // Fallback to mock data
+    const mockPosts = generateCountryPosts(countryCode, country);
+    return {
+      posts: mockPosts.map(p => ({
+        id: p.id,
+        text: p.text,
+        author: p.author.replace('@', ''),
+        authorHandle: p.author,
+        timestamp: p.timestamp,
+        engagement: p.engagement,
+        likes: Math.floor(p.engagement * 0.6),
+        retweets: Math.floor(p.engagement * 0.3),
+        replies: Math.floor(p.engagement * 0.1),
+      })),
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+export async function fetchRealTrendingTopics(
+  countryCode: string
+): Promise<RealTrendingResponse> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.warn('Supabase not configured, using mock data');
+    const mockTopicsList = COUNTRY_TOPICS[countryCode] || ['Local News', 'Economy', 'Sports', 'Culture', 'Weather'];
+    return {
+      topics: mockTopicsList.map((name, i) => ({
+        name,
+        url: '#',
+        tweetVolume: Math.floor(Math.random() * 50000) + 1000,
+        query: encodeURIComponent(name),
+      })),
+      location: countryCode,
+    };
+  }
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/trending-topics`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+      body: JSON.stringify({ countryCode }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch real trending topics:', error);
+    // Fallback to mock data
+    const mockTopicsList = COUNTRY_TOPICS[countryCode] || ['Local News', 'Economy', 'Sports', 'Culture', 'Weather'];
+    return {
+      topics: mockTopicsList.map((name) => ({
+        name,
+        url: '#',
+        tweetVolume: Math.floor(Math.random() * 50000) + 1000,
+        query: encodeURIComponent(name),
+      })),
+      location: countryCode,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
