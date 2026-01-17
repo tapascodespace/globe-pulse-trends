@@ -41,7 +41,7 @@ export function TrendingPanel({ topics, isLoading }: TrendingPanelProps) {
 
   return (
     <div 
-      className="w-72 max-h-[70vh] flex flex-col rounded-xl border backdrop-blur-xl transition-colors duration-300"
+      className="w-56 md:w-64 lg:w-72 max-h-[60vh] md:max-h-[70vh] flex flex-col rounded-xl border backdrop-blur-xl transition-colors duration-300"
       style={{
         background: theme.panelBg,
         borderColor: theme.panelBorder,
