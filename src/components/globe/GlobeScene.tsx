@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback } from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Stars } from '@react-three/drei';
 import { GlobeMesh } from './GlobeMesh';
 import { CountryMarkers } from './CountryMarkers';
 import { TopicArcs } from './TopicArcs';
@@ -49,8 +49,20 @@ function GlobeContent({ data, countries }: Omit<GlobeSceneProps, 'isLoading'>) {
         enableDamping
       />
       
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[5, 3, 5]} intensity={0.4} />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[5, 3, 5]} intensity={0.5} />
+      <directionalLight position={[-3, -2, -3]} intensity={0.2} />
+      
+      {/* Space stars background */}
+      <Stars 
+        radius={80} 
+        depth={60} 
+        count={4000} 
+        factor={4} 
+        saturation={0} 
+        fade 
+        speed={0.3}
+      />
       
       <GlobeMesh radius={2} theme={theme} />
       
@@ -79,21 +91,19 @@ export function GlobeScene({ data, countries, isLoading }: GlobeSceneProps) {
   const theme = themes[themeId];
 
   return (
-    <div 
-      className="absolute inset-0 transition-colors duration-500"
-      style={{ background: theme.background }}
-    >
+    <div className="absolute inset-0">
       <Canvas gl={{ antialias: true, alpha: false }}>
         <Suspense fallback={null}>
-          <color attach="background" args={[theme.background]} />
+          <color attach="background" args={['#05080f']} />
+          <fog attach="fog" args={['#05080f', 12, 25]} />
           <GlobeContent data={data} countries={countries} />
         </Suspense>
       </Canvas>
       
       {isLoading && (
         <div 
-          className="absolute inset-0 flex items-center justify-center z-20 transition-colors"
-          style={{ background: `${theme.background}80` }}
+          className="absolute inset-0 flex items-center justify-center z-20"
+          style={{ background: 'rgba(5, 8, 15, 0.8)' }}
         >
           <div className="flex flex-col items-center gap-3">
             <div 

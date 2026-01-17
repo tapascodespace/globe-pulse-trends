@@ -161,13 +161,28 @@ export function GlobeMesh({ radius = 2, theme }: GlobeMeshProps) {
 
   return (
     <group ref={groupRef}>
-      {/* Solid sphere surface */}
+      {/* Solid sphere surface - grey globe */}
       <mesh>
         <sphereGeometry args={[radius, 64, 48]} />
-        <meshBasicMaterial color={theme.globeSurface} />
+        <meshStandardMaterial 
+          color={theme.globeSurface} 
+          roughness={0.8}
+          metalness={0.1}
+        />
+      </mesh>
+      
+      {/* Subtle atmosphere glow */}
+      <mesh>
+        <sphereGeometry args={[radius * 1.02, 48, 32]} />
+        <meshBasicMaterial
+          color={theme.accentColor}
+          transparent
+          opacity={0.03}
+          depthWrite={false}
+        />
       </mesh>
 
-      {/* Grid lines - Snapchat style */}
+      {/* Grid lines */}
       <lineSegments geometry={gridGeometry} material={gridMaterial} />
       
       {/* Country borders */}
