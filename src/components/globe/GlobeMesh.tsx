@@ -1,18 +1,16 @@
-// GlobeMesh - Solid sphere with real world country borders
+// GlobeMesh - Grid-style globe like Snapchat maps with real country borders
 
 import { useRef, useMemo, useEffect, useState } from 'react';
-import { Mesh, LineSegments, BufferGeometry, Float32BufferAttribute, LineBasicMaterial, Color, Group } from 'three';
+import { BufferGeometry, Float32BufferAttribute, LineBasicMaterial, Color, Group } from 'three';
 import { useFrame } from '@react-three/fiber';
 import * as topojson from 'topojson-client';
 import type { Topology, GeometryCollection } from 'topojson-specification';
 import { WORLD_TOPOJSON_URL } from '@/data/worldData';
+import type { GlobeTheme } from '@/lib/themes';
 
 interface GlobeMeshProps {
   radius?: number;
-  borderColor?: string;
-  gridColor?: string;
-  surfaceColor?: string;
-  showGrid?: boolean;
+  theme: GlobeTheme;
 }
 
 interface WorldTopology extends Topology {
@@ -41,7 +39,6 @@ function createCountryBorders(
 ): BufferGeometry {
   const positions: number[] = [];
   
-  // Get country mesh from topology
   const countries = topojson.feature(topology, topology.objects.countries);
   
   if (countries.type === 'FeatureCollection') {
@@ -76,10 +73,7 @@ function addRingToPositions(
     const [lon1, lat1] = ring[i];
     const [lon2, lat2] = ring[i + 1];
     
-    // Skip if coordinates are invalid
     if (isNaN(lon1) || isNaN(lat1) || isNaN(lon2) || isNaN(lat2)) continue;
-    
-    // Skip very long lines (crossing dateline artifacts)
     if (Math.abs(lon2 - lon1) > 90) continue;
     
     const [x1, y1, z1] = latLonTo3D(lat1, lon1, radius);
@@ -89,36 +83,32 @@ function addRingToPositions(
   }
 }
 
-// Create graticule (lat/lon grid lines)
-function createGraticule(radius: number): BufferGeometry {
+// Create Snapchat-style grid (denser, cleaner grid pattern)
+function createSnapchatGrid(radius: number): BufferGeometry {
   const positions: number[] = [];
-  const segments = 60;
+  const segments = 72;
 
-  // Latitude lines every 30 degrees
-  for (let lat = -60; lat <= 60; lat += 30) {
-    for (let i = 0; i <= segments; i++) {
+  // Latitude lines every 15 degrees
+  for (let lat = -75; lat <= 75; lat += 15) {
+    for (let i = 0; i < segments; i++) {
       const lon1 = (i / segments) * 360 - 180;
       const lon2 = ((i + 1) / segments) * 360 - 180;
       
-      if (i < segments) {
-        const [x1, y1, z1] = latLonTo3D(lat, lon1, radius);
-        const [x2, y2, z2] = latLonTo3D(lat, lon2, radius);
-        positions.push(x1, y1, z1, x2, y2, z2);
-      }
+      const [x1, y1, z1] = latLonTo3D(lat, lon1, radius);
+      const [x2, y2, z2] = latLonTo3D(lat, lon2, radius);
+      positions.push(x1, y1, z1, x2, y2, z2);
     }
   }
 
-  // Longitude lines every 30 degrees
-  for (let lon = -180; lon < 180; lon += 30) {
-    for (let i = 0; i <= segments; i++) {
+  // Longitude lines every 15 degrees
+  for (let lon = -180; lon < 180; lon += 15) {
+    for (let i = 0; i < segments; i++) {
       const lat1 = (i / segments) * 180 - 90;
       const lat2 = ((i + 1) / segments) * 180 - 90;
       
-      if (i < segments) {
-        const [x1, y1, z1] = latLonTo3D(lat1, lon, radius);
-        const [x2, y2, z2] = latLonTo3D(lat2, lon, radius);
-        positions.push(x1, y1, z1, x2, y2, z2);
-      }
+      const [x1, y1, z1] = latLonTo3D(lat1, lon, radius);
+      const [x2, y2, z2] = latLonTo3D(lat2, lon, radius);
+      positions.push(x1, y1, z1, x2, y2, z2);
     }
   }
 
@@ -127,109 +117,62 @@ function createGraticule(radius: number): BufferGeometry {
   return geometry;
 }
 
-export function GlobeMesh({ 
-  radius = 2, 
-  borderColor = '#00e5ff',
-  gridColor = '#00e5ff',
-  surfaceColor = '#0a1220',
-  showGrid = true
-}: GlobeMeshProps) {
+export function GlobeMesh({ radius = 2, theme }: GlobeMeshProps) {
   const groupRef = useRef<Group>(null);
   const [bordersGeometry, setBordersGeometry] = useState<BufferGeometry | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Fetch and parse world topology
   useEffect(() => {
     fetch(WORLD_TOPOJSON_URL)
       .then(res => res.json())
       .then((topology: WorldTopology) => {
-        const geometry = createCountryBorders(topology, radius * 1.001);
+        const geometry = createCountryBorders(topology, radius * 1.002);
         setBordersGeometry(geometry);
-        setIsLoading(false);
       })
       .catch(err => {
         console.error('Failed to load world data:', err);
-        setIsLoading(false);
       });
   }, [radius]);
 
-  // Create graticule grid
-  const graticuleGeometry = useMemo(() => createGraticule(radius * 1.0005), [radius]);
+  // Create grid
+  const gridGeometry = useMemo(() => createSnapchatGrid(radius * 1.001), [radius]);
 
-  // Materials
+  // Materials - update based on theme
   const borderMaterial = useMemo(() => 
     new LineBasicMaterial({ 
-      color: new Color(borderColor), 
+      color: new Color(theme.borderColor), 
       transparent: true, 
-      opacity: 0.85,
-    }), [borderColor]);
+      opacity: 0.9,
+    }), [theme.borderColor]);
 
   const gridMaterial = useMemo(() => 
     new LineBasicMaterial({ 
-      color: new Color(gridColor).multiplyScalar(0.25), 
+      color: new Color(theme.gridColor), 
       transparent: true, 
-      opacity: 0.3
-    }), [gridColor]);
+      opacity: theme.id === 'light' ? 0.4 : 0.25
+    }), [theme.gridColor, theme.id]);
 
   // Slow auto-rotation
   useFrame((_, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.012;
+      groupRef.current.rotation.y += delta * 0.01;
     }
   });
 
   return (
     <group ref={groupRef}>
-      {/* Solid dark sphere - the actual globe surface */}
+      {/* Solid sphere surface */}
       <mesh>
         <sphereGeometry args={[radius, 64, 48]} />
-        <meshStandardMaterial 
-          color={surfaceColor}
-          roughness={0.95}
-          metalness={0.05}
-        />
-      </mesh>
-      
-      {/* Ocean color layer */}
-      <mesh>
-        <sphereGeometry args={[radius * 0.999, 64, 48]} />
-        <meshBasicMaterial 
-          color="#061018"
-        />
-      </mesh>
-      
-      {/* Atmosphere glow */}
-      <mesh>
-        <sphereGeometry args={[radius * 1.015, 48, 32]} />
-        <meshBasicMaterial
-          color="#00e5ff"
-          transparent
-          opacity={0.02}
-          depthWrite={false}
-        />
+        <meshBasicMaterial color={theme.globeSurface} />
       </mesh>
 
-      {/* Graticule grid lines */}
-      {showGrid && (
-        <lineSegments geometry={graticuleGeometry} material={gridMaterial} />
-      )}
+      {/* Grid lines - Snapchat style */}
+      <lineSegments geometry={gridGeometry} material={gridMaterial} />
       
       {/* Country borders */}
       {bordersGeometry && (
         <lineSegments geometry={bordersGeometry} material={borderMaterial} />
-      )}
-      
-      {/* Loading indicator sphere pulse */}
-      {isLoading && (
-        <mesh>
-          <sphereGeometry args={[radius * 1.01, 32, 24]} />
-          <meshBasicMaterial
-            color="#00e5ff"
-            transparent
-            opacity={0.1}
-            wireframe
-          />
-        </mesh>
       )}
     </group>
   );

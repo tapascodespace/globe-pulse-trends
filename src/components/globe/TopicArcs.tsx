@@ -1,19 +1,19 @@
-// TopicArcs - Great circle arcs between countries (rendered OUTSIDE the globe)
+// TopicArcs - Thin, aesthetic arcs between countries
 
 import { useMemo, useRef } from 'react';
-import { CubicBezierCurve3, Vector3, BufferGeometry, Line, LineBasicMaterial, Color, TubeGeometry, MeshBasicMaterial, Mesh } from 'three';
+import { CubicBezierCurve3, Vector3, BufferGeometry, LineBasicMaterial, Color, Line } from 'three';
 import { useFrame } from '@react-three/fiber';
 import type { TopicArc } from '@/types/globe';
-import { getArcVisualConfig } from '@/types/globe';
+import type { GlobeTheme } from '@/lib/themes';
 
 interface TopicArcsProps {
   arcs: TopicArc[];
   radius?: number;
   selectedTopicId: string | null;
   maxArcs?: number;
+  theme: GlobeTheme;
 }
 
-// Convert lat/lon to 3D position
 function latLonToVector3(lat: number, lon: number, radius: number): Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lon + 180) * (Math.PI / 180);
@@ -25,25 +25,18 @@ function latLonToVector3(lat: number, lon: number, radius: number): Vector3 {
   );
 }
 
-// Create a great circle arc between two points - OUTSIDE the globe
-function createArcCurve(start: Vector3, end: Vector3, baseRadius: number, heightMultiplier: number): CubicBezierCurve3 {
+function createArcCurve(start: Vector3, end: Vector3, baseRadius: number): CubicBezierCurve3 {
   const mid = new Vector3().addVectors(start, end).multiplyScalar(0.5);
   const distance = start.distanceTo(end);
+  const arcHeight = Math.max(0.2, distance * 0.25);
   
-  // Arc height is proportional to distance - higher arcs for longer distances
-  // Minimum height ensures arcs are always visible above the globe
-  const arcHeight = Math.max(0.3, distance * heightMultiplier * 0.4);
-  
-  // Normalize mid point and push it outward
   mid.normalize().multiplyScalar(baseRadius + arcHeight);
   
-  // Create control points that ensure the arc stays outside
   const control1 = new Vector3().lerpVectors(start, mid, 0.4);
   const control2 = new Vector3().lerpVectors(mid, end, 0.4);
   
-  // Push control points outward
-  control1.normalize().multiplyScalar(baseRadius + arcHeight * 0.7);
-  control2.normalize().multiplyScalar(baseRadius + arcHeight * 0.7);
+  control1.normalize().multiplyScalar(baseRadius + arcHeight * 0.6);
+  control2.normalize().multiplyScalar(baseRadius + arcHeight * 0.6);
   
   return new CubicBezierCurve3(start, control1, control2, end);
 }
@@ -53,109 +46,66 @@ interface ArcLineProps {
   radius: number;
   isHighlighted: boolean;
   isFaded: boolean;
+  theme: GlobeTheme;
 }
 
-function ArcLine({ arc, radius, isHighlighted, isFaded }: ArcLineProps) {
-  const meshRef = useRef<Mesh>(null);
-  const pulseRef = useRef<Mesh>(null);
+function ArcLine({ arc, radius, isHighlighted, isFaded, theme }: ArcLineProps) {
+  const lineRef = useRef<Line>(null);
+  const dotRef = useRef<any>(null);
   const timeRef = useRef(Math.random() * 100);
   
-  const config = useMemo(() => getArcVisualConfig(arc.strength), [arc.strength]);
-  
-  const { tubeGeometry, curve, points } = useMemo(() => {
-    // Start and end points slightly above the globe surface
-    const startRadius = radius * 1.02;
+  const { geometry, curve } = useMemo(() => {
+    const startRadius = radius * 1.01;
     const start = latLonToVector3(arc.fromLat, arc.fromLon, startRadius);
     const end = latLonToVector3(arc.toLat, arc.toLon, startRadius);
+    const curve = createArcCurve(start, end, radius);
+    const points = curve.getPoints(48);
+    const geometry = new BufferGeometry().setFromPoints(points);
     
-    // Height multiplier based on whether highlighted
-    const heightMult = isHighlighted ? 0.6 : 0.5;
-    const curve = createArcCurve(start, end, radius, heightMult);
-    const points = curve.getPoints(64);
-    
-    // Create tube geometry for thicker, more visible arcs
-    let tubeRadius = config.thickness * 0.008;
-    if (isHighlighted) {
-      tubeRadius *= 2;
-    } else if (isFaded) {
-      tubeRadius *= 0.4;
-    }
-    
-    const tubeGeometry = new TubeGeometry(curve, 64, tubeRadius, 8, false);
-    
-    return { tubeGeometry, curve, points };
-  }, [arc, radius, config.thickness, isHighlighted, isFaded]);
+    return { geometry, curve };
+  }, [arc, radius]);
 
   const material = useMemo(() => {
-    let opacity = config.opacity;
-    let color = config.color;
+    let opacity = isFaded ? 0.1 : (isHighlighted ? 0.9 : 0.5);
+    let color = theme.arcColor;
     
     if (isFaded) {
-      opacity = 0.08;
-      color = '#004455';
-    } else if (isHighlighted) {
-      opacity = 1;
-      color = '#00ffff';
+      color = theme.gridColor;
     }
     
-    return new MeshBasicMaterial({
+    return new LineBasicMaterial({
       color: new Color(color),
       transparent: true,
       opacity,
-      depthWrite: false,
     });
-  }, [config, isHighlighted, isFaded]);
+  }, [theme, isHighlighted, isFaded]);
 
-  // Animate pulse and glow
+  // Animate traveling dot
   useFrame((_, delta) => {
-    timeRef.current += delta * (isHighlighted ? 2 : 1);
+    timeRef.current += delta * (isHighlighted ? 1.5 : 0.8);
     
-    if (meshRef.current) {
-      const mat = meshRef.current.material as MeshBasicMaterial;
-      if (isHighlighted) {
-        const pulse = Math.sin(timeRef.current * 4) * 0.15 + 0.85;
-        mat.opacity = pulse;
-      }
-    }
-    
-    // Animate the pulse traveling along the arc
-    if (pulseRef.current && (isHighlighted || arc.strength >= 0.5)) {
-      const t = (timeRef.current * 0.3) % 1;
+    if (dotRef.current && !isFaded) {
+      const t = (timeRef.current * 0.2) % 1;
       const pos = curve.getPoint(t);
-      pulseRef.current.position.copy(pos);
+      dotRef.current.position.copy(pos);
       
-      const pulseScale = isHighlighted ? 0.05 : 0.03;
-      const scale = Math.sin(t * Math.PI) * pulseScale + pulseScale * 0.5;
-      pulseRef.current.scale.setScalar(scale);
+      const scale = isHighlighted ? 0.025 : 0.015;
+      dotRef.current.scale.setScalar(scale * (Math.sin(t * Math.PI) * 0.5 + 0.8));
     }
   });
 
-  const showPulse = isHighlighted || (!isFaded && arc.strength >= 0.5);
-
   return (
     <group>
-      <mesh ref={meshRef} geometry={tubeGeometry} material={material} />
+      <primitive ref={lineRef} object={new Line(geometry, material)} />
       
-      {/* Traveling pulse dot */}
-      {showPulse && (
-        <mesh ref={pulseRef}>
-          <sphereGeometry args={[1, 12, 8]} />
+      {/* Traveling dot */}
+      {!isFaded && (
+        <mesh ref={dotRef}>
+          <sphereGeometry args={[1, 8, 6]} />
           <meshBasicMaterial 
-            color={isHighlighted ? "#ffffff" : "#00e5ff"} 
+            color={theme.accentColor} 
             transparent 
-            opacity={isHighlighted ? 1 : 0.8}
-          />
-        </mesh>
-      )}
-      
-      {/* Glow effect for highlighted arcs */}
-      {isHighlighted && (
-        <mesh geometry={tubeGeometry}>
-          <meshBasicMaterial
-            color="#00ffff"
-            transparent
-            opacity={0.3}
-            depthWrite={false}
+            opacity={isHighlighted ? 1 : 0.7}
           />
         </mesh>
       )}
@@ -167,24 +117,20 @@ export function TopicArcs({
   arcs, 
   radius = 2, 
   selectedTopicId,
-  maxArcs = 60 
+  maxArcs = 50,
+  theme
 }: TopicArcsProps) {
-  // Filter and sort arcs
   const visibleArcs = useMemo(() => {
-    // Sort by strength
     const sorted = [...arcs].sort((a, b) => b.strength - a.strength);
     
-    // Always include selected topic arcs
     const selectedArcs = selectedTopicId 
       ? sorted.filter(a => a.topicId === selectedTopicId)
       : [];
     
-    // Get top arcs (filter out very low strength unless selected)
     const topArcs = sorted
-      .filter(a => a.strength >= 0.25 || a.topicId === selectedTopicId)
+      .filter(a => a.strength >= 0.3 || a.topicId === selectedTopicId)
       .slice(0, maxArcs);
     
-    // Merge without duplicates
     const arcMap = new Map<string, TopicArc>();
     [...topArcs, ...selectedArcs].forEach(arc => arcMap.set(arc.id, arc));
     
@@ -200,6 +146,7 @@ export function TopicArcs({
           radius={radius}
           isHighlighted={selectedTopicId === arc.topicId}
           isFaded={selectedTopicId !== null && selectedTopicId !== arc.topicId}
+          theme={theme}
         />
       ))}
     </group>
