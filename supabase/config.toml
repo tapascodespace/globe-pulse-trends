@@ -1,1 +1,10 @@
 project_id = "uynszjswreybknuvhdio"
+
+[functions.realtime-globe]
+verify_jwt = false
+
+[functions.x-feed]
+verify_jwt = false
+
+[functions.trending-topics]
+verify_jwt = false
