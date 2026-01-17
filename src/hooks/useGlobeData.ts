@@ -1,7 +1,7 @@
-// XMaps Globe Data Hook - Central data management
+// XMaps Globe Data Hook - Central data management with real X API
 
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, fetchRealXFeed, fetchRealTrendingTopics } from '@/lib/api';
 import type { TimeWindow, GlobalSummary, Country, CountryDetail, TopicDetail } from '@/types/globe';
 
 export function useGlobalSummary(window: TimeWindow) {
@@ -36,5 +36,26 @@ export function useTopicDetail(topicId: string | null) {
     queryFn: () => api.getTopicDetail(topicId!),
     enabled: !!topicId,
     staleTime: 15000,
+  });
+}
+
+// New hooks for real X API data
+export function useRealXFeed(country: string | null, countryCode: string | null, topics?: string[]) {
+  return useQuery({
+    queryKey: ['x-feed', countryCode, topics],
+    queryFn: () => fetchRealXFeed(country!, countryCode!, topics),
+    enabled: !!country && !!countryCode,
+    staleTime: 60000, // Cache for 1 minute
+    retry: 1,
+  });
+}
+
+export function useRealTrendingTopics(countryCode: string | null) {
+  return useQuery({
+    queryKey: ['trending-topics', countryCode],
+    queryFn: () => fetchRealTrendingTopics(countryCode!),
+    enabled: !!countryCode,
+    staleTime: 300000, // Cache for 5 minutes (trends don't change that fast)
+    retry: 1,
   });
 }
