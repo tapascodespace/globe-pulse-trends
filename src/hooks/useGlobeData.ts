@@ -1,29 +1,23 @@
 // XMaps Globe Data Hook - Central data management with real X API
 
 import { useQuery } from '@tanstack/react-query';
-import { 
-  api, 
-  generateInitialSummary, 
-  getMockCountries, 
-  fetchRealXFeed, 
-  fetchRealTrendingTopics 
-} from '@/lib/api';
+import { api, fetchRealXFeed, fetchRealTrendingTopics } from '@/lib/api';
 import type { TimeWindow, GlobalSummary, Country, CountryDetail, TopicDetail } from '@/types/globe';
 
 export function useGlobalSummary(window: TimeWindow) {
   return useQuery<GlobalSummary>({
     queryKey: ['summary', window],
-    queryFn: () => generateInitialSummary(window),
-    refetchInterval: false, // WebSocket handles live updates
-    staleTime: Infinity,
+    queryFn: () => api.getSummary(window),
+    refetchInterval: 30000, // Fallback polling every 30s
+    staleTime: 10000,
   });
 }
 
 export function useCountries() {
   return useQuery<Country[]>({
     queryKey: ['countries'],
-    queryFn: () => getMockCountries(),
-    staleTime: Infinity, // Countries are static
+    queryFn: () => api.getCountries(),
+    staleTime: Infinity, // Countries don't change
   });
 }
 

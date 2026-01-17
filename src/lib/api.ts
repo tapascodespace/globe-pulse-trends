@@ -130,103 +130,36 @@ export function connectLiveFeed(
   }
 }
 
-// WebSocket Live Feed Connection via Supabase Edge Function
+// WebSocket Live Feed Connection (alternative)
 export function connectWebSocketFeed(
   window: TimeWindow,
   onUpdate: (update: LiveUpdate) => void,
-  onError?: (error: Event) => void,
-  onStateChange?: (state: 'connecting' | 'connected' | 'disconnected') => void
+  onError?: (error: Event) => void
 ): () => void {
-  const wsUrl = 'wss://uynszjswreybknuvhdio.functions.supabase.co/functions/v1/realtime-globe';
+  const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
   
-  let ws: WebSocket | null = null;
-  let reconnectAttempts = 0;
-  const maxReconnectAttempts = 5;
-  let reconnectTimeout: number | undefined;
-  let isClosedIntentionally = false;
+  try {
+    const ws = new WebSocket(`${wsUrl}/api/ws?window=${window}`);
 
-  const connect = () => {
-    try {
-      onStateChange?.('connecting');
-      console.log('[WebSocket] Connecting to realtime-globe...');
-      
-      ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const update = JSON.parse(event.data) as LiveUpdate;
+        onUpdate(update);
+      } catch (e) {
+        console.error('Failed to parse WS message:', e);
+      }
+    };
 
-      ws.onopen = () => {
-        console.log('[WebSocket] Connected successfully');
-        reconnectAttempts = 0;
-        onStateChange?.('connected');
-        
-        // Subscribe with the current time window
-        ws?.send(JSON.stringify({ type: 'subscribe', window }));
-      };
+    ws.onerror = (error) => {
+      console.warn('WebSocket error');
+      onError?.(error as Event);
+    };
 
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          console.log('[WebSocket] Received:', message.type);
-          
-          if (message.type === 'update' && message.data) {
-            // Handle different update types
-            const update = message.data as LiveUpdate;
-            if (update.type === 'full_sync') {
-              // Full sync contains multiple updates
-              console.log('[WebSocket] Full sync received');
-            }
-            onUpdate(update);
-          } else if (message.type === 'heartbeat') {
-            console.log('[WebSocket] Heartbeat received');
-          } else if (message.type === 'connected') {
-            console.log('[WebSocket] Session established:', message.sessionId);
-          }
-        } catch (e) {
-          console.error('[WebSocket] Failed to parse message:', e);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.warn('[WebSocket] Error occurred');
-        onError?.(error as Event);
-      };
-
-      ws.onclose = (event) => {
-        console.log('[WebSocket] Connection closed:', event.code, event.reason);
-        onStateChange?.('disconnected');
-        
-        if (!isClosedIntentionally && reconnectAttempts < maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-          console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
-          reconnectAttempts++;
-          reconnectTimeout = setTimeout(connect, delay) as unknown as number;
-        }
-      };
-    } catch (error) {
-      console.warn('[WebSocket] Failed to create connection:', error);
-      onStateChange?.('disconnected');
-    }
-  };
-
-  connect();
-
-  // Return cleanup function
-  return () => {
-    isClosedIntentionally = true;
-    if (reconnectTimeout) clearTimeout(reconnectTimeout);
-    if (ws) {
-      ws.send(JSON.stringify({ type: 'unsubscribe' }));
-      ws.close();
-      ws = null;
-    }
-  };
-}
-
-// Exported for use by hooks - initial data before WebSocket connects
-export function getMockCountries(): Country[] {
-  return ALL_COUNTRIES;
-}
-
-export function generateInitialSummary(window: TimeWindow): GlobalSummary {
-  return generateMockSummary();
+    return () => ws.close();
+  } catch (error) {
+    console.warn('WebSocket not available');
+    return () => {};
+  }
 }
 
 // Mock Data for Demo/Development
@@ -248,6 +181,10 @@ function getMockData<T>(endpoint: string): T {
   return {} as T;
 }
 
+function getMockCountries(): Country[] {
+  // Import all countries from comprehensive list
+  return ALL_COUNTRIES;
+}
 
 const mockTopics = [
   { title: 'AI Regulation Summit', id: '1' },

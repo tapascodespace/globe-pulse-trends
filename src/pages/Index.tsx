@@ -19,8 +19,9 @@ export default function Index() {
   const { data: summaryData, isLoading: summaryLoading } = useGlobalSummary(timeWindow);
   const { data: countriesData, isLoading: countriesLoading } = useCountries();
   
-  const { connectionState, isConnected } = useLiveFeed({ 
+  useLiveFeed({ 
     window: timeWindow, 
+    connectionType: 'sse',
     enabled: true 
   });
 

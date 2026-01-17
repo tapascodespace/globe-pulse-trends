@@ -71,15 +71,9 @@ export interface GlobalSummary {
 }
 
 export interface LiveUpdate {
-  type: 'topic_update' | 'arc_update' | 'country_update' | 'full_sync';
-  data: Topic | TopicArc | CountryActivity | FullSyncData;
+  type: 'topic_update' | 'arc_update' | 'country_update';
+  data: Topic | TopicArc | CountryActivity;
   timestamp: string;
-}
-
-export interface FullSyncData {
-  topics?: Topic[];
-  countries?: CountryActivity[];
-  arcs?: TopicArc[];
 }
 
 // Visual mapping helpers
