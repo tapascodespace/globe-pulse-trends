@@ -220,6 +220,15 @@ export function connectWebSocketFeed(
   };
 }
 
+// Exported for use by hooks - initial data before WebSocket connects
+export function getMockCountries(): Country[] {
+  return ALL_COUNTRIES;
+}
+
+export function generateInitialSummary(window: TimeWindow): GlobalSummary {
+  return generateMockSummary();
+}
+
 // Mock Data for Demo/Development
 function getMockData<T>(endpoint: string): T {
   if (endpoint.includes('/api/summary')) {
@@ -239,10 +248,6 @@ function getMockData<T>(endpoint: string): T {
   return {} as T;
 }
 
-function getMockCountries(): Country[] {
-  // Import all countries from comprehensive list
-  return ALL_COUNTRIES;
-}
 
 const mockTopics = [
   { title: 'AI Regulation Summit', id: '1' },
